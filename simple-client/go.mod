@@ -1,4 +1,4 @@
-module github.com/perun-network/perun-tutorial/go-perun-test
+module github.com/perun-network/perun-examples/simple-client
 
 go 1.15
 
