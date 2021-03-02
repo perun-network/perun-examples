@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"perun.network/go-perun/client"
 )
@@ -18,7 +17,6 @@ func main() {
 	if err := bob.openChannel(); err != nil {
 		panic(fmt.Errorf("opening channel: %w", err))
 	}
-	time.Sleep(100 * time.Millisecond) // Wait for Alice to be ready.
 	if err := bob.updateChannel(); err != nil {
 		panic(fmt.Errorf("updating channel: %w", err))
 	}
