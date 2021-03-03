@@ -400,3 +400,5 @@ gotest.tools v2.2.0+incompatible/go.mod h1:DsYFclhRJ6vuDpmuTbkuFWG+y2sxOXAzmJt81
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 perun.network/go-perun v0.6.1-0.20210120095724-92ce567916a0 h1:8uz7nMaXZ8B9TnEAIabJH0ur2DrdAJCqo946AZK4urQ=
 perun.network/go-perun v0.6.1-0.20210120095724-92ce567916a0/go.mod h1:pBUGJDd6oBGaK5sHJcY7OfZvGhgEGC/6x2Ezv72X6Z4=
+perun.network/go-perun v0.6.1-0.20210302085855-37f6187c1df8 h1:5hQRTsin+aXhL08Aji6rdJSqu0j+ybbU5gl6Z9AigXE=
+perun.network/go-perun v0.6.1-0.20210302085855-37f6187c1df8/go.mod h1:pBUGJDd6oBGaK5sHJcY7OfZvGhgEGC/6x2Ezv72X6Z4=
