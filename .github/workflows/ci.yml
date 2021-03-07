@@ -1,29 +1,33 @@
 name: CI
-
-on:
-  push:
-    branches: [ dev, master ]
-  pull_request:
+on: [push, pull_request]
 
 jobs:
-  ci:
+  test-examples:
+    name: Test Examples
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.15
+      - name: Install Ganache-CLI
+        run: npm install ganache-cli
 
-    - name: Dependencies
-      run: |
-        docker pull trufflesuite/ganache-cli
+      - name: Simple Client
+        working-directory: simple-client
+        env:
+          MNEMONIC: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
+        run: |
+          npx ganache-cli -b 5 -a 2 -m "$MNEMONIC" &
+          GANACHE_PID=$!
+          sleep 5
+          go run .
+          kill $GANACHE_PID
 
-    - name: Simple Client
-      run: |
-        docker run --name=ganache --rm --net=host trufflesuite/ganache-cli -b 5 -a 2 -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic" &
-        sleep 5
-        cd simple-client && go run . && cd ..
-        docker stop ganache
-
+      - name: Collateralized Channels
+        working-directory: collateralized-channels
+        env:
+          GANACHE_CMD: npx ganache-cli
+        run: go test -v -timeout 60s .
