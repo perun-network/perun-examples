@@ -31,3 +31,9 @@ jobs:
         env:
           GANACHE_CMD: npx ganache-cli
         run: go test -v -timeout 60s .
+
+      - name: App Channel
+        working-directory: app-channel
+        env:
+          GANACHE_CMD: npx ganache-cli
+        run: go test -v -timeout 60s .
