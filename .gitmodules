@@ -1,3 +1,6 @@
 [submodule "collateralized-channels/contracts/perun-eth-contracts"]
 	path = collateralized-channels/contracts/perun-eth-contracts
 	url = https://github.com/hyperledger-labs/perun-eth-contracts
+[submodule "app-channel/contracts/perun-eth-contracts"]
+	path = app-channel/contracts/perun-eth-contracts
+	url = https://github.com/hyperledger-labs/perun-eth-contracts
