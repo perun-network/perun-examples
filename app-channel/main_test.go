@@ -36,6 +36,7 @@ import (
 // Test parameters
 var (
 	blockTimeInSeconds    = 1 * time.Second
+	challengeDuration     = 3 * time.Second
 	defaultContextTimeout = 30 * time.Second
 	hostClient1           = "127.0.0.1:8546"
 	hostClient2           = "127.0.0.1:8547"
@@ -255,7 +256,7 @@ func createClientConfig(nodeURL string, contracts ContractAddresses, privateKey 
 				},
 			},
 		},
-		ChallengeDuration: collateralWithdrawalDelay / 2,
+		ChallengeDuration: challengeDuration,
 		AppAddress:        contracts.AppAddr,
 		ContextTimeout:    defaultContextTimeout,
 	}
