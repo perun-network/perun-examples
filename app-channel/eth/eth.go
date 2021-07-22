@@ -63,7 +63,7 @@ func (c *Client) DeployApp(adjudicatorAddr common.Address) (addr common.Address,
 	}, false)
 }
 
-func (c *Client) DeployAssetHolderETH(adjudicatorAddr common.Address, appAddr common.Address, collateralWithdrawalDelay *big.Int) (addr common.Address, tx *types.Transaction, err error) {
+func (c *Client) DeployAssetHolderETH(adjudicatorAddr common.Address, appAddr common.Address) (addr common.Address, tx *types.Transaction, err error) {
 	return c.deployContract(func(to *bind.TransactOpts, c *ethclient.Client) (addr common.Address, tx *types.Transaction, err error) {
 		addr, tx, _, err = assetholdereth.DeployAssetHolderETH(to, c, adjudicatorAddr)
 		return

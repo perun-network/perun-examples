@@ -35,13 +35,12 @@ import (
 
 // Test parameters
 var (
-	blockTimeInSeconds        = 1 * time.Second
-	defaultContextTimeout     = 30 * time.Second
-	collateralWithdrawalDelay = 10 * blockTimeInSeconds
-	hostClient1               = "127.0.0.1:8546"
-	hostClient2               = "127.0.0.1:8547"
-	stake                     = eth.EthToWei(big.NewFloat(10))
-	playerTimeout             = 30 * time.Second
+	blockTimeInSeconds    = 1 * time.Second
+	defaultContextTimeout = 30 * time.Second
+	hostClient1           = "127.0.0.1:8546"
+	hostClient2           = "127.0.0.1:8547"
+	stake                 = eth.EthToWei(big.NewFloat(10))
+	playerTimeout         = 30 * time.Second
 )
 
 // TestTicTacToeApp is an end-to-end test of the tic tac toe channel application.
@@ -190,7 +189,7 @@ func setupClients(t *testing.T) (*client.Client, *client.Client) {
 	log.Print("Deploying contracts...")
 	nodeURL := ganacheCfg.NodeURL()
 	deploymentKey := ganache.Accounts[0].PrivateKey
-	contracts, err := deployContracts(nodeURL, ganacheCfg.ChainID, deploymentKey, defaultContextTimeout, collateralWithdrawalDelay)
+	contracts, err := deployContracts(nodeURL, ganacheCfg.ChainID, deploymentKey, defaultContextTimeout)
 	require.NoError(err, "deploying contracts")
 
 	log.Print("Setting up clients...")
