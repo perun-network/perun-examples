@@ -95,14 +95,14 @@ contract TicTacToeApp is App {
         // 6 7 8
 
         // Check winner.
-        uint8[3][8] memory v = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
-            [0, 4, 8], [2, 4, 6] // diagonals
+        uint8[3][8] memory winningRows = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // horizontal
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // vertical
+            [0, 4, 8], [2, 4, 6]             // diagonal
         ];
         
-        for (uint i = 0; i < v.length; i++) {
-            (bool ok, uint8 idx) = samePlayer(d, v[i]);
+        for (uint i = 0; i < winningRows.length; i++) {
+            (bool ok, uint8 idx) = samePlayer(d, winningRows[i]);
             if (ok) {
                 return (true, true, idx);
             }
