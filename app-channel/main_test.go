@@ -94,7 +94,7 @@ func TestTicTacToeApp(t *testing.T) {
 	require.NoError(<-player2Err)
 
 	// Player1 set (1, 2)
-	player1Action <- set{1, 2}
+	player1Action <- force{1, 2}
 	require.NoError(<-player1Err)
 
 	// Player1 conclude
@@ -118,6 +118,9 @@ type (
 		stake    *big.Int
 	}
 	set struct {
+		x, y int
+	}
+	force struct {
 		x, y int
 	}
 	conclude struct{}
@@ -153,6 +156,10 @@ func playerRoutine(ctx context.Context, name string, c *client.Client, actions c
 			case set:
 				logPrintf("Setting (%d, %d)", a.x, a.y)
 				errors <- g.Set(a.x, a.y)
+				fmt.Println(g.String())
+			case force:
+				logPrintf("Forcing (%d, %d)", a.x, a.y)
+				errors <- g.Force(a.x, a.y)
 				fmt.Println(g.String())
 			case conclude:
 				logPrintf("Concluding")

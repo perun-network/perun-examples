@@ -63,6 +63,33 @@ func (g *Game) Set(x, y int) error {
 	return nil
 }
 
+func (g *Game) Force(x, y int) error {
+	g.Lock()
+	defer g.Unlock()
+
+	ctx, cancel := g.c.defaultContextWithTimeout()
+	defer cancel()
+
+	err := g.ch.ForceUpdate(ctx, func(s *channel.State) {
+		err := func() error {
+			_app, ok := s.App.(*app.TicTacToeApp)
+			if !ok {
+				return fmt.Errorf("invalid app type: %T", _app)
+			}
+
+			return _app.Set(s, x, y, g.ch.Idx())
+		}()
+		if err != nil {
+			panic(err)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	g.state = g.ch.State().Clone()
+	return nil
+}
+
 func (g *Game) Conclude() error {
 	g.Lock()
 	defer g.Unlock()
