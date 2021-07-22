@@ -24,7 +24,7 @@ import "./perun-eth-contracts/contracts/Channel.sol";
 /**
  * @notice TicTacToeApp is a channel app for playing tic tac toe.
  * The data is encoded as follows:
- * - data[0]: The index of the actor.
+ * - data[0]: The index of the next actor.
  * - data[i], i in [1,10]: The value of field i. 0 means no tick, 1 means tick by player 1, 2 means tick by player 2.
  */
 contract TicTacToeApp is App {
@@ -54,12 +54,10 @@ contract TicTacToeApp is App {
     {
         require(params.participants.length == numParts, "number of participants");
 
-        bytes memory appData = to.appData;
-        uint8 actorIndex = uint8(appData[actorDataIndex]);
-        uint8 prevActorIndex = uint8(from.appData[actorDataIndex]);
-        require(appData.length == appDataLength, "data length");
+        uint8 actorIndex = uint8(from.appData[actorDataIndex]);
+        require(to.appData.length == appDataLength, "data length");
         require(actorIndex == signerIdx, "actor not signer");
-        require((prevActorIndex + 1) % numParts == actorIndex, "wait turn");
+        require((actorIndex + 1) % numParts == uint8(to.appData[actorDataIndex]), "next actor");
 
         // Test valid action.
         bool changed = false;
@@ -73,7 +71,7 @@ contract TicTacToeApp is App {
         }
 
         // Test final state.
-        (bool isFinal, bool hasWinner, uint8 winner) = checkFinal(appData);
+        (bool isFinal, bool hasWinner, uint8 winner) = checkFinal(to.appData);
         require(to.isFinal == isFinal, "final flag");
         Array.requireEqualAddressArray(to.outcome.assets, from.outcome.assets);
         Channel.requireEqualSubAllocArray(to.outcome.locked, from.outcome.locked);
