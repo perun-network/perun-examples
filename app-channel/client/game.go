@@ -70,11 +70,6 @@ func (g *Game) Conclude() error {
 	ctx, cancel := g.c.defaultContextWithTimeout()
 	defer cancel()
 
-	err := g.ch.Register(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "registering")
-	}
-
-	err = g.ch.Settle(ctx, false)
+	err := g.ch.Settle(ctx, false)
 	return errors.WithMessage(err, "settling channel")
 }
