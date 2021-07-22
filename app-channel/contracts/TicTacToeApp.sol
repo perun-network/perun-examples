@@ -77,6 +77,7 @@ contract TicTacToeApp is App {
         Channel.requireEqualSubAllocArray(to.outcome.locked, from.outcome.locked);
         uint256[][] memory expectedBalances = from.outcome.balances;
         if (hasWinner) {
+            require(winner==0, "has winner !=0");
             uint8 loser = 1 - winner;
             expectedBalances = new uint256[][](expectedBalances.length);
             for (uint i = 0; i < expectedBalances.length; i++) {
@@ -126,9 +127,13 @@ contract TicTacToeApp is App {
                 return (false, 0);
             }
         }
-        uint8 playerIndex = firstPlayer;
-        if (uint8(first) == secondPlayer) {
+        uint8 playerIndex;
+        if (uint8(first) == firstPlayer) {
+            playerIndex = 0;
+        } else if (uint8(first) == secondPlayer) {
             playerIndex = 1;
+        } else {
+            revert("invalid field value");
         }
         return (true, playerIndex);
     }
