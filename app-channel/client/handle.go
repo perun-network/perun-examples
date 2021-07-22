@@ -117,7 +117,9 @@ func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 
 		g, ok := c.games[e.ID()]
 		if !ok {
-			log.Panicf("channel %v not found", e.ID())
+			// We may see the concluded event twice.
+			log.Warnf("channel %v not found", e.ID())
+			return
 		}
 
 		g.ch.Close()
