@@ -100,11 +100,14 @@ contract TicTacToeApp is App {
             [0, 3, 6], [1, 4, 7], [2, 5, 8], // vertical
             [0, 4, 8], [2, 4, 6]             // diagonal
         ];
-        
         for (uint i = 0; i < winningRows.length; i++) {
-            (bool ok, uint8 idx) = samePlayer(d, winningRows[i]);
+            (bool ok, uint8 v) = sameValue(d, winningRows[i]);
             if (ok) {
-                return (true, true, idx);
+                if (v == firstPlayer) {
+                    return (true, true, 0);
+                } else if (v == secondPlayer) {
+                    return (true, true, 1);
+                }
             }
         }
 
@@ -117,25 +120,14 @@ contract TicTacToeApp is App {
         return (true, false, 0);
     }
 
-    function samePlayer(bytes memory d, uint8[3] memory gridIndices) internal pure returns (bool ok, uint8 idx) {
+    function sameValue(bytes memory d, uint8[3] memory gridIndices) internal pure returns (bool ok, uint8 v) {
         bytes1 first = d[gridDataIndex + gridIndices[0]];
-        if (uint8(first) == notSet) {
-            return (false, 0);
-        }
-        for (uint i = 0; i < gridIndices.length; i++) {
+        for (uint i = 1; i < gridIndices.length; i++) {
             if (d[gridDataIndex + gridIndices[i]] != first) {
                 return (false, 0);
             }
         }
-        uint8 playerIndex;
-        if (uint8(first) == firstPlayer) {
-            playerIndex = 0;
-        } else if (uint8(first) == secondPlayer) {
-            playerIndex = 1;
-        } else {
-            revert("invalid field value");
-        }
-        return (true, playerIndex);
+        return (true, uint8(first));
     }
 
     function requireEqualUint256ArrayArray(
