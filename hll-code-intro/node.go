@@ -47,13 +47,13 @@ func setupNode() *node {
 	funder := setupFunder(chain, account.Account, assetholder)
 
 	// Create the go-perun client.
-	client, err := perun.New(/*TODO*/)
+	client, err := perun.New(cfg.bobAddr, bus, funder, adjudicator, wallet)
 	noError(err)
 
 	// Create the node that defines all event handlers for go-perun.
 	node := &node{account, transactor, chain, client}
 	// Start Proposal- and UpdateHandlers.
-	go client.Handle(/*TODO*/)
+	go client.Handle(node, node)
 
 	return node
 }
@@ -76,20 +76,23 @@ func (n *node) openChannel(initAmount *big.Int) *perun.Channel {
 	fmt.Println("Opening channel")
 	// Set the initial balances for each peer and each asset in the channel.
 	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{ethwallet.AsWalletAddr(/*TODO*/)},
-		Balances: [][]*big.Int{{ /*Bob*/ /*TODO*/, /*TODO*/ /*Alice*/}},
+		Assets:   []channel.Asset{ethwallet.AsWalletAddr(cfg.assetAddr)},
+		Balances: [][]*big.Int{{ /*Bob*/ initAmount, initAmount /*Alice*/}},
 	}
 	// Define the participants of the channel.
 	// Bob goes first since he proposes the channel.
 	parts := []wire.Address{
-		/*TODO*/,
+		cfg.bobAddr,
+		cfg.aliceAddr,
 	}
 	// Create a ledger channel proposal.
-	/*TODO*/
+	proposal, err := perun.NewLedgerChannelProposal(10, cfg.bobAddr, initBals, parts)
+	noError(err)
 	// Propose the channel.
-	/*TODO*/
+	channel, err := n.client.ProposeChannel(context.Background(), proposal)
+	noError(err)
 	// Start the on-chain watcher.
-	/*TODO*/
+	go channel.Watch(n)
 
 	fmt.Printf("Opened channel with id 0x%x \n", channel.ID())
 	return channel
@@ -99,9 +102,11 @@ func (n *node) openChannel(initAmount *big.Int) *perun.Channel {
 func sendBalance(ch *perun.Channel, amount *big.Int) {
 	err := ch.UpdateBy(context.Background(), func(state *channel.State) error {
 		// Subtract the amount from Bobs balance.
-		/*TODO*/
+		bobBal := new(big.Int).Sub(state.Balances[assetIdx][bobIndex], amount)
+		state.Balances[assetIdx][bobIndex] = bobBal
 		// Add the amount Alice' balance.
-		/*TODO*/
+		aliceBal := new(big.Int).Add(state.Balances[assetIdx][aliceIndex], amount)
+		state.Balances[assetIdx][aliceIndex] = aliceBal
 
 		return nil
 	})
@@ -113,14 +118,14 @@ func closeChannel(ch *perun.Channel) {
 	fmt.Println("Closing the channel")
 	// Send a final update to Alice.
 	err := ch.UpdateBy(context.Background(), func(state *channel.State) error {
-		/*TODO*/
-
+		state.IsFinal = true
 		return nil
 	})
 	noError(err)
 	// Settle the channel and withdraw on-chain funds.
-	/*TODO*/
-
+	err = ch.Settle(context.Background(), false)
+	noError(err)
 	// Free remaining go and go-perun resources.
-	/*TODO*/
+	err = ch.Close()
+	noError(err)
 }

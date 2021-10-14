@@ -1,4 +1,4 @@
-# HLL Budapest - Code Intro (Unfinished version)
+# HLL Budapest - Code Intro (Finished version)
 
 ![architecture](.assets/architecture.png)
 
