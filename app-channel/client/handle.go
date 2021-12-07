@@ -42,7 +42,7 @@ func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *clie
 		err = responder.Reject(ctx, "accepting only ledger channel proposals")
 		return
 	} else if _, ok = _proposal.App.(*app.TicTacToeApp); !ok {
-		err = responder.Reject(ctx, "accepting only collateralized channels")
+		err = responder.Reject(ctx, "accepting only tic tac toe app channels")
 		return
 	}
 

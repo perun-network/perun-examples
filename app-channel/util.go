@@ -41,7 +41,7 @@ func toEth(weiAmount *big.Int) string {
 	return fmt.Sprintf("%vETH", eth.WeiToEth(weiAmount))
 }
 
-func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.PrivateKey, contextTimeout time.Duration, collateralWithdrawalDelay time.Duration) (contracts ContractAddresses, err error) {
+func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.PrivateKey, contextTimeout time.Duration) (contracts ContractAddresses, err error) {
 	ethClient, err := eth.NewEthClient(nodeURL, deploymentKey, chainID, contextTimeout)
 	if err != nil {
 		err = errors.WithMessage(err, "creating ethereum client")
@@ -55,17 +55,17 @@ func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.Priv
 		return
 	}
 
-	// Deploy collateralized channels app
-	appAddr, txApp, err := ethClient.DeployApp(adjudicatorAddr)
+	// Deploy app
+	appAddr, txApp, err := ethClient.DeployApp()
 	if err != nil {
-		err = errors.WithMessage(err, "deploying CollateralApp")
+		err = errors.WithMessage(err, "deploying TikTakToeApp")
 		return
 	}
 
 	// Deploy asset holder
-	assetHolderAddr, txAss, err := ethClient.DeployAssetHolderETH(adjudicatorAddr, appAddr, big.NewInt(int64(collateralWithdrawalDelay.Seconds())))
+	assetHolderAddr, txAss, err := ethClient.DeployAssetHolderETH(adjudicatorAddr)
 	if err != nil {
-		err = errors.WithMessage(err, "deploying CollateralAssetHolderETH")
+		err = errors.WithMessage(err, "deploying AssetHolderETH")
 		return
 	}
 

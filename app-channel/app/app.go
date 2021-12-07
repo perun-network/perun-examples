@@ -24,7 +24,7 @@ import (
 	"perun.network/go-perun/wallet"
 )
 
-// TicTacToeApp is a channel app enabling collateralized channels.
+// TicTacToeApp is a channel app.
 type TicTacToeApp struct {
 	Addr wallet.Address
 }

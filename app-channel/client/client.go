@@ -38,14 +38,6 @@ type ClientConfig struct {
 	ContextTimeout    time.Duration
 }
 
-type PaymentAcceptancePolicy = func(
-	amount *big.Int,
-	collateral *big.Int,
-	funding *big.Int,
-	balance *big.Int,
-	hasOverdrawn bool,
-) (ok bool)
-
 type Client struct {
 	sync.Mutex
 	perunClient       *perun.Client
