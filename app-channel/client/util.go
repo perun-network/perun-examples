@@ -38,7 +38,7 @@ func (c *Client) PerunAddress() wallet.Address {
 }
 
 func (c *Client) Address() common.Address {
-	return c.perunClient.Account.EthAddress()
+	return c.perunClient.Account.Account.Address
 }
 
 func (c *Client) challengeDurationInSeconds() uint64 {

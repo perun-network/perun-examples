@@ -17,6 +17,8 @@ package perun
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/types"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -26,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"perun.network/go-perun/backend/ethereum/channel"
 	"perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wire"
 	"perun.network/go-perun/wire/net"
@@ -53,22 +56,25 @@ type Client struct {
 	Bus             *net.Bus
 	Listener        net.Listener
 	ContractBackend channel.ContractInterface
-	Wallet          *Wallet
-	Account         *Account
+	Wallet          *swallet.Wallet
+	Account         *swallet.Account
 }
 
 func SetupClient(cfg ClientConfig) (*Client, error) {
 	// Create wallet and account
-	w := createWallet(cfg.PrivateKey)
+	clientWallet := swallet.NewWallet(cfg.PrivateKey)
 	addr := wallet.AsWalletAddr(crypto.PubkeyToAddress(cfg.PrivateKey.PublicKey))
-	pAccount, err := w.Unlock(addr)
+	pAccount, err := clientWallet.Unlock(addr)
 	if err != nil {
 		panic("failed to create account")
 	}
-	account := pAccount.(*Account)
+	account := pAccount.(*swallet.Account)
 
 	// Create Ethereum client and contract backend
-	ethClient, cb, err := createContractBackend(cfg.ETHNodeURL, w)
+	signer := types.NewEIP155Signer(big.NewInt(1337))
+	transactor := swallet.NewTransactor(clientWallet, signer)
+
+	ethClient, cb, err := createContractBackend(cfg.ETHNodeURL, transactor)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating contract backend")
 	}
@@ -77,30 +83,30 @@ func SetupClient(cfg ClientConfig) (*Client, error) {
 	// A client should validate the smart contracts it is using them, if the
 	// given contract addresses come from an untrusted source.
 
-	adjudicator := channel.NewAdjudicator(cb, cfg.AdjudicatorAddr, account.EthAddress(), account.EthAccount())
+	adjudicator := channel.NewAdjudicator(cb, cfg.AdjudicatorAddr, account.Account.Address, account.Account)
 
 	listener, bus, err := setupNetwork(account, cfg.Host, cfg.PeerAddresses, cfg.DialerTimeout)
 	if err != nil {
 		return nil, errors.WithMessage(err, "setting up network")
 	}
 
-	funder := createFunder(cb, account.EthAccount(), cfg.AssetHolderAddr)
+	funder := createFunder(cb, account.Account, cfg.AssetHolderAddr)
 
-	c, err := client.New(account.Address(), bus, funder, adjudicator, w)
+	c, err := client.New(account.Address(), bus, funder, adjudicator, clientWallet)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
-	return &Client{ethClient, c, bus, listener, cb, w, account}, nil
+	return &Client{ethClient, c, bus, listener, cb, clientWallet, account}, nil
 }
 
-func createContractBackend(nodeURL string, wallet *Wallet) (*ethclient.Client, channel.ContractBackend, error) {
-	client, err := ethclient.Dial(nodeURL)
+func createContractBackend(nodeURL string, transactor channel.Transactor) (*ethclient.Client, channel.ContractBackend, error) {
+	ethClient, err := ethclient.Dial(nodeURL)
 	if err != nil {
 		return nil, channel.ContractBackend{}, nil
 	}
 
-	return client, channel.NewContractBackend(client, wallet), nil
+	return ethClient, channel.NewContractBackend(ethClient, transactor), nil
 }
 
 func setupNetwork(account wire.Account, host string, peerAddresses []PeerWithAddress, dialerTimeout time.Duration) (listener net.Listener, bus *net.Bus, err error) {
