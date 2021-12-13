@@ -28,11 +28,10 @@ import (
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/app"
-	"perun.network/perun-examples/app-channel/perun"
 )
 
 type ClientConfig struct {
-	perun.ClientConfig
+	SetupClientConfig
 	ChallengeDuration time.Duration
 	AppAddress        common.Address
 	ContextTimeout    time.Duration
@@ -40,18 +39,18 @@ type ClientConfig struct {
 
 type Client struct {
 	sync.Mutex
-	perunClient       *perun.Client
-	assetHolderAddr   common.Address
-	assetHolder       *assetholdereth.AssetHolderETH
-	games             map[channel.ID]*Game
-	challengeDuration time.Duration
-	appAddress        common.Address
-	contextTimeout    time.Duration
-	gameProposals     chan *GameProposal
+	PerunClient       *PerunClient
+	AssetHolderAddr   common.Address
+	AssetHolder       *assetholdereth.AssetHolderETH
+	Games             map[channel.ID]*Game
+	ChallengeDuration time.Duration
+	AppAddress        common.Address
+	ContextTimeout    time.Duration
+	GameProposals     chan *GameProposal
 }
 
 func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := perun.SetupClient(cfg.ClientConfig)
+	perunClient, err := SetupClient(cfg.SetupClientConfig)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating perun client")
 	}
@@ -76,8 +75,8 @@ func StartClient(cfg ClientConfig) (*Client, error) {
 	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(cfg.AppAddress))
 	channel.RegisterApp(_app)
 
-	go c.perunClient.PerunClient.Handle(c, c)
-	go c.perunClient.Bus.Listen(c.perunClient.Listener)
+	go c.PerunClient.StateChClient.Handle(c, c)
+	go c.PerunClient.Bus.Listen(c.PerunClient.Listener)
 
 	return c, nil
 }
@@ -88,14 +87,14 @@ func (c *Client) ProposeGame(opponent common.Address, stake *big.Int) (*Game, er
 
 	ctx, cancel := c.defaultContextWithTimeout()
 	defer cancel()
-	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(c.appAddress))
-	peers := []wire.Address{c.perunClient.Account.Address(), ewallet.AsWalletAddr(opponent)}
+	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(c.AppAddress))
+	peers := []wire.Address{c.PerunClient.Account.Address(), ewallet.AsWalletAddr(opponent)}
 	withApp := client.WithApp(_app, _app.InitData(0))
 
 	prop, err := client.NewLedgerChannelProposal(
 		c.challengeDurationInSeconds(),
 		c.PerunAddress(),
-		makeStakeAllocation(c.assetHolderAddr, stake),
+		makeStakeAllocation(c.AssetHolderAddr, stake),
 		peers,
 		withApp,
 	)
@@ -103,7 +102,7 @@ func (c *Client) ProposeGame(opponent common.Address, stake *big.Int) (*Game, er
 		return nil, errors.WithMessage(err, "creating channel proposal")
 	}
 
-	perunChannel, err := c.perunClient.PerunClient.ProposeChannel(ctx, prop)
+	perunChannel, err := c.PerunClient.StateChClient.ProposeChannel(ctx, prop)
 	if err != nil {
 		return nil, errors.WithMessage(err, "proposing channel")
 	}
@@ -112,7 +111,7 @@ func (c *Client) ProposeGame(opponent common.Address, stake *big.Int) (*Game, er
 }
 
 func (c *Client) NextGameProposal() (*GameProposal, error) {
-	p, ok := <-c.gameProposals
+	p, ok := <-c.GameProposals
 	if !ok {
 		return nil, fmt.Errorf("channel closed")
 	}
@@ -127,7 +126,7 @@ func (c *Client) newGame(perunChannel *client.Channel) *Game {
 		perunChannel.State().Clone(),
 		make(chan error, 1),
 	}
-	c.games[perunChannel.ID()] = g
+	c.Games[perunChannel.ID()] = g
 	// Start the on-chain watcher.
 	go func() {
 		g.errs <- g.ch.Watch(c)

@@ -34,19 +34,19 @@ func makeStakeAllocation(asset common.Address, stake *big.Int) *channel.Allocati
 }
 
 func (c *Client) PerunAddress() wallet.Address {
-	return c.perunClient.Account.Address()
+	return c.PerunClient.Account.Address()
 }
 
 func (c *Client) Address() common.Address {
-	return c.perunClient.Account.Account.Address
+	return c.PerunClient.Account.Account.Address
 }
 
 func (c *Client) challengeDurationInSeconds() uint64 {
-	return uint64(c.challengeDuration.Seconds())
+	return uint64(c.ChallengeDuration.Seconds())
 }
 
 func (c *Client) defaultContextWithTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), c.contextTimeout)
+	return context.WithTimeout(context.Background(), c.ContextTimeout)
 }
 
 func (c *Client) Logf(format string, v ...interface{}) {
@@ -56,5 +56,5 @@ func (c *Client) Logf(format string, v ...interface{}) {
 func (c *Client) OnChainBalance() (b *big.Int, err error) {
 	ctx, cancel := c.defaultContextWithTimeout()
 	defer cancel()
-	return c.perunClient.EthClient.BalanceAt(ctx, c.Address(), nil)
+	return c.PerunClient.EthClient.BalanceAt(ctx, c.Address(), nil)
 }

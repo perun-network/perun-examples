@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package perun
+package client
 
 import (
 	"crypto/ecdsa"
@@ -40,7 +40,7 @@ type PeerWithAddress struct {
 	Address string
 }
 
-type ClientConfig struct {
+type SetupClientConfig struct {
 	PrivateKey      *ecdsa.PrivateKey
 	Host            string
 	ETHNodeURL      string
@@ -50,9 +50,9 @@ type ClientConfig struct {
 	PeerAddresses   []PeerWithAddress
 }
 
-type Client struct {
+type PerunClient struct {
 	EthClient       *ethclient.Client
-	PerunClient     *client.Client
+	StateChClient   *client.Client
 	Bus             *net.Bus
 	Listener        net.Listener
 	ContractBackend channel.ContractInterface
@@ -60,7 +60,7 @@ type Client struct {
 	Account         *swallet.Account
 }
 
-func SetupClient(cfg ClientConfig) (*Client, error) {
+func SetupClient(cfg SetupClientConfig) (*PerunClient, error) {
 	// Create wallet and account
 	clientWallet := swallet.NewWallet(cfg.PrivateKey)
 	addr := wallet.AsWalletAddr(crypto.PubkeyToAddress(cfg.PrivateKey.PublicKey))
@@ -97,7 +97,7 @@ func SetupClient(cfg ClientConfig) (*Client, error) {
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
-	return &Client{ethClient, c, bus, listener, cb, clientWallet, account}, nil
+	return &PerunClient{ethClient, c, bus, listener, cb, clientWallet, account}, nil
 }
 
 func createContractBackend(nodeURL string, transactor channel.Transactor) (*ethclient.Client, channel.ContractBackend, error) {

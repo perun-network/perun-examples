@@ -51,7 +51,7 @@ func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *clie
 		response: make(chan bool),
 		result:   make(chan *ProposalResult),
 	}
-	c.gameProposals <- prop
+	c.GameProposals <- prop
 	select {
 	case <-ctx.Done():
 		err = responder.Reject(ctx, "proposal response timeout")
@@ -82,7 +82,7 @@ func (c *Client) HandleUpdate(cur *channel.State, update client.ChannelUpdate, r
 	ctx, cancel := c.defaultContextWithTimeout()
 	defer cancel()
 
-	g, ok := c.games[update.State.ID]
+	g, ok := c.Games[update.State.ID]
 	if !ok {
 		err = responder.Reject(ctx, "unknown channel")
 		return
@@ -115,12 +115,12 @@ func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 		c.Lock()
 		defer c.Unlock()
 
-		g, ok := c.games[e.ID()]
+		g, ok := c.Games[e.ID()]
 		if !ok {
 			log.Panicf("channel %v not found", e.ID())
 		}
 
 		g.ch.Close()
-		delete(c.games, e.ID())
+		delete(c.Games, e.ID())
 	}
 }

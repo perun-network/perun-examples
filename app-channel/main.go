@@ -27,7 +27,6 @@ import (
 	"perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/perun-examples/app-channel/client"
 	"perun.network/perun-examples/app-channel/eth"
-	"perun.network/perun-examples/app-channel/perun"
 )
 
 type Role int
@@ -272,14 +271,14 @@ func initConfig() {
 // createClientConfig is a helper function for client setup.
 func createClientConfig(nodeURL string, contracts ContractAddresses, privateKey *ecdsa.PrivateKey, host string, peerAddress *wallet.Address, peerHost string) client.ClientConfig {
 	return client.ClientConfig{
-		ClientConfig: perun.ClientConfig{
+		SetupClientConfig: client.SetupClientConfig{
 			PrivateKey:      privateKey,
 			Host:            host,
 			ETHNodeURL:      nodeURL,
 			AdjudicatorAddr: contracts.AdjudicatorAddr,
 			AssetHolderAddr: contracts.AssetHolderAddr,
 			DialerTimeout:   1 * time.Second,
-			PeerAddresses: []perun.PeerWithAddress{
+			PeerAddresses: []client.PeerWithAddress{
 				{
 					Peer:    peerAddress,
 					Address: peerHost,
