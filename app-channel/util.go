@@ -58,7 +58,7 @@ func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.Priv
 	// Deploy app
 	appAddr, txApp, err := ethClient.DeployApp()
 	if err != nil {
-		err = errors.WithMessage(err, "deploying TikTakToeApp")
+		err = errors.WithMessage(err, "deploying TikTacToe app")
 		return
 	}
 
