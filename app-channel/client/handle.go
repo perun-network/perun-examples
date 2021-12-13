@@ -120,7 +120,10 @@ func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 			log.Panicf("channel %v not found", e.ID())
 		}
 
-		g.ch.Close()
+		err := g.ch.Close()
+		if err != nil {
+			log.Error(err)
+		}
 		delete(c.Games, e.ID())
 	}
 }
