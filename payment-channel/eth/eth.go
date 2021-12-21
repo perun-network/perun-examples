@@ -30,7 +30,7 @@ import (
 	"perun.network/go-perun/backend/ethereum/bindings/assetholdereth"
 )
 
-type Client struct {
+type EthClient struct {
 	ethClient      *ethclient.Client
 	key            *ecdsa.PrivateKey
 	chainID        *big.Int
@@ -38,31 +38,31 @@ type Client struct {
 	nonce          int64
 }
 
-func NewEthClient(nodeURL string, key *ecdsa.PrivateKey, chainID *big.Int, contextTimeout time.Duration) (*Client, error) {
+func NewEthClient(nodeURL string, key *ecdsa.PrivateKey, chainID *big.Int, contextTimeout time.Duration) (*EthClient, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 	client, err := ethclient.DialContext(ctx, nodeURL)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{client, key, chainID, contextTimeout, 0}, nil
+	return &EthClient{client, key, chainID, contextTimeout, 0}, nil
 }
 
-func (c *Client) DeployAdjudicator() (addr common.Address, tx *types.Transaction, err error) {
+func (c *EthClient) DeployAdjudicator() (addr common.Address, tx *types.Transaction, err error) {
 	return c.deployContract(func(to *bind.TransactOpts, c *ethclient.Client) (addr common.Address, tx *types.Transaction, err error) {
 		addr, tx, _, err = adjudicator.DeployAdjudicator(to, c)
 		return
 	}, false)
 }
 
-func (c *Client) DeployAssetHolderETH(adjudicatorAddr common.Address) (addr common.Address, tx *types.Transaction, err error) {
+func (c *EthClient) DeployAssetHolderETH(adjudicatorAddr common.Address) (addr common.Address, tx *types.Transaction, err error) {
 	return c.deployContract(func(to *bind.TransactOpts, c *ethclient.Client) (addr common.Address, tx *types.Transaction, err error) {
 		addr, tx, _, err = assetholdereth.DeployAssetHolderETH(to, c, adjudicatorAddr)
 		return
 	}, false)
 }
 
-func (c *Client) deployContract(
+func (c *EthClient) deployContract(
 	deployContract func(*bind.TransactOpts, *ethclient.Client) (common.Address, *types.Transaction, error),
 	waitConfirmation bool,
 ) (common.Address, *types.Transaction, error) {
@@ -87,7 +87,7 @@ func (c *Client) deployContract(
 	return addr, tx, nil
 }
 
-func (c *Client) WaitDeployment(txs ...*types.Transaction) (err error) {
+func (c *EthClient) WaitDeployment(txs ...*types.Transaction) (err error) {
 	ctx, cancel := c.defaultContext()
 	defer cancel()
 	for _, tx := range txs {
@@ -99,11 +99,11 @@ func (c *Client) WaitDeployment(txs ...*types.Transaction) (err error) {
 	return nil
 }
 
-func (c *Client) defaultContext() (context.Context, context.CancelFunc) {
+func (c *EthClient) defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), c.contextTimeout)
 }
 
-func (c *Client) newTransactor(ctx context.Context) (*bind.TransactOpts, error) {
+func (c *EthClient) newTransactor(ctx context.Context) (*bind.TransactOpts, error) {
 	tr, err := bind.NewKeyedTransactorWithChainID(c.key, c.chainID)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (c *Client) newTransactor(ctx context.Context) (*bind.TransactOpts, error) 
 	return tr, nil
 }
 
-func (c *Client) AccountBalance(a common.Address) (b *big.Int, err error) {
+func (c *EthClient) AccountBalance(a common.Address) (b *big.Int, err error) {
 	return c.ethClient.BalanceAt(context.Background(), a, nil)
 }
 
