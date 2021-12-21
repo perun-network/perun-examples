@@ -31,7 +31,7 @@ import (
 )
 
 type ClientConfig struct {
-	SetupClientConfig
+	PerunClientConfig
 	ChallengeDuration time.Duration
 	AppAddress        common.Address
 	ContextTimeout    time.Duration
@@ -50,7 +50,7 @@ type Client struct {
 }
 
 func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := SetupClient(cfg.SetupClientConfig)
+	perunClient, err := setupPerunClient(cfg.PerunClientConfig)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating perun client")
 	}

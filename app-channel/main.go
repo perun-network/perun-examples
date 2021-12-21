@@ -271,7 +271,7 @@ func initConfig() {
 // createClientConfig is a helper function for client setup.
 func createClientConfig(nodeURL string, contracts ContractAddresses, privateKey *ecdsa.PrivateKey, host string, peerAddress *wallet.Address, peerHost string) client.ClientConfig {
 	return client.ClientConfig{
-		SetupClientConfig: client.SetupClientConfig{
+		PerunClientConfig: client.PerunClientConfig{
 			PrivateKey:      privateKey,
 			Host:            host,
 			ETHNodeURL:      nodeURL,

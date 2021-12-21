@@ -40,7 +40,7 @@ type PeerWithAddress struct {
 	Address string
 }
 
-type SetupClientConfig struct {
+type PerunClientConfig struct {
 	PrivateKey      *ecdsa.PrivateKey
 	Host            string
 	ETHNodeURL      string
@@ -60,7 +60,7 @@ type PerunClient struct {
 	Account         *swallet.Account
 }
 
-func SetupClient(cfg SetupClientConfig) (*PerunClient, error) {
+func setupPerunClient(cfg PerunClientConfig) (*PerunClient, error) {
 	// Create wallet and account
 	clientWallet := swallet.NewWallet(cfg.PrivateKey)
 	addr := wallet.AsWalletAddr(crypto.PubkeyToAddress(cfg.PrivateKey.PublicKey))
