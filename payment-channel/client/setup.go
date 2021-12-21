@@ -47,7 +47,7 @@ type PeerWithAddress struct {
 	Address string
 }
 
-type SetupClientConfig struct {
+type PerunClientConfig struct {
 	Role            Role
 	PrivateKey      *ecdsa.PrivateKey
 	Host            string
@@ -69,7 +69,7 @@ type PerunClient struct {
 	Account         *swallet.Account
 }
 
-func setupClient(cfg SetupClientConfig) (*PerunClient, error) {
+func setupPerunClient(cfg PerunClientConfig) (*PerunClient, error) {
 	// Create wallet and account
 	clientWallet := swallet.NewWallet(cfg.PrivateKey)
 	addr := wallet.AsWalletAddr(crypto.PubkeyToAddress(cfg.PrivateKey.PublicKey))

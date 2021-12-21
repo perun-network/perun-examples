@@ -31,7 +31,7 @@ import (
 )
 
 type ClientConfig struct {
-	SetupClientConfig
+	PerunClientConfig
 	ContextTimeout time.Duration
 }
 
@@ -42,11 +42,10 @@ type Client struct {
 	AssetHolder     *assetholdereth.AssetHolderETH
 	ContextTimeout  time.Duration
 	Channel         *client.Channel
-	Done            chan struct{}
 }
 
 func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := setupClient(cfg.SetupClientConfig)
+	perunClient, err := setupPerunClient(cfg.PerunClientConfig)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating perun client")
 	}
@@ -63,7 +62,6 @@ func StartClient(cfg ClientConfig) (*Client, error) {
 		ah,
 		cfg.ContextTimeout,
 		nil,
-		make(chan struct{}),
 	}
 
 	go c.PerunClient.StateChClient.Handle(c, c)
@@ -142,6 +140,5 @@ func (c *Client) CloseChannel() error {
 	if err := c.Channel.Close(); err != nil {
 		return fmt.Errorf("closing channel object: %w", err)
 	}
-	close(c.Done)
 	return nil
 }
