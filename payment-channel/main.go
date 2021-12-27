@@ -26,18 +26,15 @@ import (
 )
 
 type config struct {
-	chainURL    string                            // Url of the Ethereum node.
-	chainID     *big.Int                          // ID of the targeted chain
-	hosts       map[client.Role]string            // Hosts for incoming connections.
-	privateKeys map[client.Role]*ecdsa.PrivateKey // Private keys.
-	addrs       map[client.Role]*wallet.Address   // Wallet addresses.
+	chainURL              string                            // Url of the Ethereum node.
+	chainID               *big.Int                          // ID of the targeted chain
+	hosts                 map[client.Role]string            // Hosts for incoming connections.
+	privateKeys           map[client.Role]*ecdsa.PrivateKey // Private keys.
+	addrs                 map[client.Role]*wallet.Address   // Wallet addresses.
+	defaultContextTimeout time.Duration                     // Default time for timeout
 }
 
-// Test parameters
-var (
-	cfg                   config
-	defaultContextTimeout = 15 * time.Second
-)
+var cfg config
 
 // main performs the opening, updating and closing of a simple perun payment channel
 func main() {
@@ -64,7 +61,7 @@ func setup() (*client.Client, *client.Client) {
 	// Deploy contracts (Bob deploys)
 	fmt.Println("Deploying contracts...")
 	nodeURL := cfg.chainURL
-	contracts, err := deployContracts(nodeURL, cfg.chainID, cfg.privateKeys[client.RoleBob], defaultContextTimeout)
+	contracts, err := deployContracts(nodeURL, cfg.chainID, cfg.privateKeys[client.RoleBob], cfg.defaultContextTimeout)
 	if err != nil {
 		panic(fmt.Errorf("deploying contracts: %v", err))
 	}
@@ -108,6 +105,8 @@ func initConfig() {
 		client.RoleBob:   "0.0.0.0:8401",
 	}
 
+	cfg.defaultContextTimeout = 15 * time.Second
+
 	// convert the private key strings ...
 	rawKeys := []string{
 		"1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f", // Alice
@@ -149,6 +148,6 @@ func createClientConfig(role client.Role, nodeURL string, contracts ContractAddr
 				},
 			},
 		},
-		ContextTimeout: defaultContextTimeout,
+		ContextTimeout: cfg.defaultContextTimeout,
 	}
 }
