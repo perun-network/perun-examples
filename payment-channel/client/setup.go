@@ -101,12 +101,12 @@ func setupPerunClient(cfg PerunClientConfig) (*PerunClient, error) {
 
 	funder := createFunder(cb, account.Account, cfg.AssetHolderAddr)
 
-	c, err := client.New(account.Address(), bus, funder, adjudicator, clientWallet)
+	stateChClient, err := client.New(account.Address(), bus, funder, adjudicator, clientWallet)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
-	return &PerunClient{cfg.Role, ethClient, c, bus, listener, cb, clientWallet, account}, nil
+	return &PerunClient{cfg.Role, ethClient, stateChClient, bus, listener, cb, clientWallet, account}, nil
 }
 
 func createContractBackend(nodeURL string, transactor channel.Transactor) (*ethclient.Client, channel.ContractBackend, error) {
