@@ -36,13 +36,14 @@ func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *clie
 	// Create a channel accept message and send it.
 	accept := _proposal.Accept(c.PerunAddress(), client.WithRandomNonce())
 	ch, err := responder.Accept(ctx, accept)
-	c.HandleNewChannel(ch) // TODO: 1/2 Check with MG why this is needed here (and not needed in App Channel example)
 
 	if err != nil {
 		fmt.Printf("%s: Accepting channel: %w\n", c.RoleAsString(), err)
 	} else {
 		fmt.Printf("%s: Accepted channel with id 0x%x\n", c.RoleAsString(), ch.ID())
 	}
+
+	c.HandleNewChannel(ch) // TODO: 1/2 Check with MG why this is needed here (and not needed in App Channel example)
 }
 
 func (c *Client) HandleUpdate(state *channel.State, update client.ChannelUpdate, responder *client.UpdateResponder) {

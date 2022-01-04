@@ -96,12 +96,13 @@ func (c *Client) OpenChannel(opponent wallet.Address) error {
 	ch, err := c.PerunClient.StateChClient.ProposeChannel(ctx, proposal)
 	c.Channel = ch
 
-	// Start the on-chain watcher to listen for events
-	c.HandleNewChannel(ch) // TODO: 2/2 Check with MG why this is needed here (and not needed in App Channel example)
-
 	if err != nil {
 		return fmt.Errorf("proposing channel: %w", err)
 	}
+
+	// Start the on-chain watcher to listen for events
+	c.HandleNewChannel(ch) // TODO: 2/2 Check with MG why this is needed here (and not needed in App Channel example)
+
 	fmt.Printf("\n 🎉 Opened channel with id 0x%x \n\n", ch.ID())
 	return nil
 }
