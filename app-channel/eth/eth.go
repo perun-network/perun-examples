@@ -31,7 +31,7 @@ import (
 	app "perun.network/perun-examples/app-channel/contracts/generated/ticTacToeApp"
 )
 
-type EthClient struct {
+type EthContractClient struct {
 	ethClient      *ethclient.Client
 	key            *ecdsa.PrivateKey
 	chainID        *big.Int
@@ -39,38 +39,38 @@ type EthClient struct {
 	nonce          int64
 }
 
-func NewEthClient(nodeURL string, key *ecdsa.PrivateKey, chainID *big.Int, contextTimeout time.Duration) (*EthClient, error) {
+func NewEthClient(nodeURL string, key *ecdsa.PrivateKey, chainID *big.Int, contextTimeout time.Duration) (*EthContractClient, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 	client, err := ethclient.DialContext(ctx, nodeURL)
 	if err != nil {
 		return nil, err
 	}
-	return &EthClient{client, key, chainID, contextTimeout, 0}, nil
+	return &EthContractClient{client, key, chainID, contextTimeout, 0}, nil
 }
 
-func (c *EthClient) DeployAdjudicator() (addr common.Address, tx *types.Transaction, err error) {
+func (c *EthContractClient) DeployAdjudicator() (addr common.Address, tx *types.Transaction, err error) {
 	return c.deployContract(func(to *bind.TransactOpts, c *ethclient.Client) (addr common.Address, tx *types.Transaction, err error) {
 		addr, tx, _, err = adjudicator.DeployAdjudicator(to, c)
 		return
 	}, false)
 }
 
-func (c *EthClient) DeployApp() (addr common.Address, tx *types.Transaction, err error) {
+func (c *EthContractClient) DeployApp() (addr common.Address, tx *types.Transaction, err error) {
 	return c.deployContract(func(to *bind.TransactOpts, c *ethclient.Client) (addr common.Address, tx *types.Transaction, err error) {
 		addr, tx, _, err = app.DeployTicTacToeApp(to, c)
 		return
 	}, false)
 }
 
-func (c *EthClient) DeployAssetHolderETH(adjudicatorAddr common.Address) (addr common.Address, tx *types.Transaction, err error) {
+func (c *EthContractClient) DeployAssetHolderETH(adjudicatorAddr common.Address) (addr common.Address, tx *types.Transaction, err error) {
 	return c.deployContract(func(to *bind.TransactOpts, c *ethclient.Client) (addr common.Address, tx *types.Transaction, err error) {
 		addr, tx, _, err = assetholdereth.DeployAssetHolderETH(to, c, adjudicatorAddr)
 		return
 	}, false)
 }
 
-func (c *EthClient) deployContract(
+func (c *EthContractClient) deployContract(
 	deployContract func(*bind.TransactOpts, *ethclient.Client) (common.Address, *types.Transaction, error),
 	waitConfirmation bool,
 ) (common.Address, *types.Transaction, error) {
@@ -95,7 +95,7 @@ func (c *EthClient) deployContract(
 	return addr, tx, nil
 }
 
-func (c *EthClient) WaitDeployment(txs ...*types.Transaction) (err error) {
+func (c *EthContractClient) WaitDeployment(txs ...*types.Transaction) (err error) {
 	ctx, cancel := c.defaultContext()
 	defer cancel()
 	for _, tx := range txs {
@@ -107,11 +107,11 @@ func (c *EthClient) WaitDeployment(txs ...*types.Transaction) (err error) {
 	return nil
 }
 
-func (c *EthClient) defaultContext() (context.Context, context.CancelFunc) {
+func (c *EthContractClient) defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), c.contextTimeout)
 }
 
-func (c *EthClient) newTransactor(ctx context.Context) (*bind.TransactOpts, error) {
+func (c *EthContractClient) newTransactor(ctx context.Context) (*bind.TransactOpts, error) {
 	tr, err := bind.NewKeyedTransactorWithChainID(c.key, c.chainID)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (c *EthClient) newTransactor(ctx context.Context) (*bind.TransactOpts, erro
 	return tr, nil
 }
 
-func (c *EthClient) AccountBalance(a common.Address) (b *big.Int, err error) {
+func (c *EthContractClient) AccountBalance(a common.Address) (b *big.Int, err error) {
 	return c.ethClient.BalanceAt(context.Background(), a, nil)
 }
 

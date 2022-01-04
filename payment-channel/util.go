@@ -42,27 +42,27 @@ func toEth(weiAmount *big.Int) string {
 }
 
 func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.PrivateKey, contextTimeout time.Duration) (contracts ContractAddresses, err error) {
-	ethClient, err := eth.NewEthClient(nodeURL, deploymentKey, chainID, contextTimeout)
+	ethContractClient, err := eth.NewEthClient(nodeURL, deploymentKey, chainID, contextTimeout)
 	if err != nil {
 		err = errors.WithMessage(err, "creating ethereum client")
 		return
 	}
 
 	// Deploy adjudicator
-	adjudicatorAddr, txAdj, err := ethClient.DeployAdjudicator()
+	adjudicatorAddr, txAdj, err := ethContractClient.DeployAdjudicator()
 	if err != nil {
 		err = errors.WithMessage(err, "deploying adjudicator")
 		return
 	}
 
 	// Deploy asset holder
-	assetHolderAddr, txAss, err := ethClient.DeployAssetHolderETH(adjudicatorAddr)
+	assetHolderAddr, txAss, err := ethContractClient.DeployAssetHolderETH(adjudicatorAddr)
 	if err != nil {
 		err = errors.WithMessage(err, "deploying AssetHolderETH")
 		return
 	}
 
-	err = ethClient.WaitDeployment(txAdj, txAss)
+	err = ethContractClient.WaitDeployment(txAdj, txAss)
 	if err != nil {
 		err = errors.WithMessage(err, "waiting for contract deployment")
 		return
