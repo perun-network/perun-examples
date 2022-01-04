@@ -38,7 +38,7 @@ type EthContractClient struct {
 	nonce          int64
 }
 
-func NewEthClient(nodeURL string, key *ecdsa.PrivateKey, chainID *big.Int, contextTimeout time.Duration) (*EthContractClient, error) {
+func NewEthContractClient(nodeURL string, key *ecdsa.PrivateKey, chainID *big.Int, contextTimeout time.Duration) (*EthContractClient, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 	client, err := ethclient.DialContext(ctx, nodeURL)

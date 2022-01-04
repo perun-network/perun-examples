@@ -42,7 +42,7 @@ func toEth(weiAmount *big.Int) string {
 }
 
 func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.PrivateKey, contextTimeout time.Duration) (contracts ContractAddresses, err error) {
-	ethContractClient, err := eth.NewEthClient(nodeURL, deploymentKey, chainID, contextTimeout)
+	ethContractClient, err := eth.NewEthContractClient(nodeURL, deploymentKey, chainID, contextTimeout)
 	if err != nil {
 		err = errors.WithMessage(err, "creating ethereum client")
 		return
