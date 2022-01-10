@@ -100,9 +100,6 @@ func (c *Client) OpenChannel(opponent wallet.Address) error {
 		return fmt.Errorf("proposing channel: %w", err)
 	}
 
-	// Start the on-chain watcher to listen for events
-	c.HandleNewChannel(ch) // TODO: 2/2 Check with MG why this is needed here (and not needed in App Channel example)
-
 	fmt.Printf("\n 🎉 Opened channel with id 0x%x \n\n", ch.ID())
 	return nil
 }
@@ -130,14 +127,12 @@ func (c *Client) CloseChannel() error {
 	ctx, cancel := c.defaultContextWithTimeout()
 	defer cancel()
 
-	if err := c.Channel.Register(ctx); err != nil {
-		return fmt.Errorf("registering channel: %w", err)
-	}
+	// .Settle() "closes" the channel (= concludes the channel and withdraws the funds)
 	if err := c.Channel.Settle(ctx, false); err != nil {
 		return fmt.Errorf("settling channel: %w", err)
 	}
-	// .Close() closes the channel object and has nothing to do with the
-	// go-perun channel protocol.
+
+	// .Close() terminates the local channel object (frees resources) and has nothing to do with the go-perun channel protocol.
 	if err := c.Channel.Close(); err != nil {
 		return fmt.Errorf("closing channel object: %w", err)
 	}
