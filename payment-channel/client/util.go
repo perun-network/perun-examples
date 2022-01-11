@@ -52,7 +52,7 @@ func (c *Client) RoleAsString() (name string) {
 	}
 }
 
-func (c *Client) OpponentRoleAsString() (name string) {
+func (c *Client) PeerRoleAsString() (name string) {
 	if 1-c.role == RoleAlice {
 		return "Alice"
 	} else {

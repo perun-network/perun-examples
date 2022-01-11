@@ -70,8 +70,8 @@ func StartClient(cfg ClientConfig) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) OpenChannel(opponent wallet.Address) error {
-	fmt.Printf("%s: Opening channel from %s to %s\n", c.RoleAsString(), c.RoleAsString(), c.OpponentRoleAsString())
+func (c *Client) OpenChannel(peer wallet.Address) error {
+	fmt.Printf("%s: Opening channel from %s to %s\n", c.RoleAsString(), c.RoleAsString(), c.PeerRoleAsString())
 	// Alice and Bob will both start with 10 ETH.
 	initBal := eth.EthToWei(big.NewFloat(10))
 	// Perun needs an initial allocation which defines the balances of all
@@ -82,7 +82,7 @@ func (c *Client) OpenChannel(opponent wallet.Address) error {
 	}
 	// All perun identities that we want to open a channel with. In this case
 	// we use the same on- and off-chain accounts but you could use different.
-	peers := []wire.Address{c.PerunClient.Account.Address(), opponent}
+	peers := []wire.Address{c.PerunClient.Account.Address(), peer}
 
 	// Prepare the proposal by defining the channel parameters.
 	proposal, err := client.NewLedgerChannelProposal(10, c.PerunAddress(), initBals, peers)
@@ -105,13 +105,13 @@ func (c *Client) OpenChannel(opponent wallet.Address) error {
 }
 
 func (c *Client) UpdateChannel() error {
-	fmt.Printf("%s: Update channel by sending 5 ETH to %s \n", c.RoleAsString(), c.OpponentRoleAsString())
+	fmt.Printf("%s: Update channel by sending 5 ETH to %s \n", c.RoleAsString(), c.PeerRoleAsString())
 
 	ctx, cancel := c.defaultContextWithTimeout()
 	defer cancel()
 	// Use UpdateBy to conveniently update the channels state.
 	return c.Channel.UpdateBy(ctx, func(state *channel.State) error {
-		// Shift 5 ETH from caller to opponent.
+		// Shift 5 ETH from caller to peer.
 		amount := eth.EthToWei(big.NewFloat(5))
 		state.Balances[0][1-c.role].Sub(state.Balances[0][1-c.role], amount)
 		state.Balances[0][c.role].Add(state.Balances[0][c.role], amount)
