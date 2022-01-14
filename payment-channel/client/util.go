@@ -15,43 +15,44 @@
 package client
 
 import (
-	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"perun.network/go-perun/backend/ethereum/channel"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire"
 )
 
-func (c *Client) PerunAddress() wallet.Address {
-	return ethwallet.
-}
+func CreateContractBackend(
+	nodeURL string,
+	chainID uint64,
+	w *swallet.Wallet,
+) (channel.ContractBackend, error) {
+	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
+	transactor := swallet.NewTransactor(w, signer) //TODO transactor should be spawnable from Wallet: Add method "NewTransactor"
 
-func (c *Client) Address() common.Address {
-	return c.PerunClient.Account.Account.Address
-}
-
-func (c *Client) Logf(format string, v ...interface{}) {
-	fmt.Printf("Client %v: %v", c.Address(), fmt.Sprintf(format, v...))
-}
-
-func (c *Client) OnChainBalance() (b *big.Int, err error) {
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-	return c.PerunClient.EthClient.BalanceAt(ctx, c.Address(), nil)
-}
-
-func (c *Client) RoleAsString() (name string) {
-	if c.role == RoleAlice {
-		return "Alice"
-	} else {
-		return "Bob"
+	ethClient, err := ethclient.Dial(nodeURL)
+	if err != nil {
+		return channel.ContractBackend{}, err
 	}
+
+	return channel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-func (c *Client) PeerRoleAsString() (name string) {
-	if 1-c.role == RoleAlice {
-		return "Alice"
-	} else {
-		return "Bob"
-	}
+// dummyAccount represents a wire account that does not support data signing.
+type dummyAccount struct {
+	addr wire.Address
+}
+
+// Address used by this account.
+func (a dummyAccount) Address() wallet.Address {
+	return a.addr
+}
+
+// SignData requests a signature from this account.
+// It returns the signature or an error.
+func (a dummyAccount) SignData(data []byte) ([]byte, error) {
+	panic("unsupported")
 }

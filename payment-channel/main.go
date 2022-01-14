@@ -15,12 +15,11 @@
 package main
 
 import (
-	"crypto/ecdsa"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
@@ -40,12 +39,14 @@ const (
 )
 
 func main() {
-	contracts := deployContracts(chainURL, privateKey) //TODO
+	contracts := deployContracts(chainURL, chainID, deploymentKey)
 
-	alice := setupClient(hostAlice, keyAlice, chainURL, contracts)
-	bob := setupClient(hostBob, keyBob, chainURL, contracts)
+	alice := startClient(chainURL, contracts, hostAlice, keyAlice)
+	bob := startClient(chainURL, contracts, hostBob, keyBob)
 
 	logAccountBalance(alice, bob)
+
+	//TODO validate asset holder when proposing a new channel or receiving a channel proposal.
 
 	alice.OpenChannel()
 	alice.UpdateChannel()
@@ -55,53 +56,33 @@ func main() {
 	logAccountBalance(alice, bob)
 }
 
-// setupClient sets up a new client with the given parameters.
-func setupClient(
+// startClient sets up a new client with the given parameters.
+func startClient(
 	nodeURL string,
 	contracts ContractAddresses,
 	host string,
 	privateKey string,
 ) *client.Client {
-	c, err := client.StartClient(clientConfig)
-
-	return c1, c2
-}
-
-// initConfig initializes the config for a test run via ganache-cli
-func initConfig() {
-	// ... to ECDSA keys:
-	privateKeys := make(map[client.Role]*ecdsa.PrivateKey, len(rawKeys))
-	for index, key := range rawKeys {
-		privateKey, _ := crypto.HexToECDSA(key)
-		privateKeys[client.Role(index)] = privateKey
+	// Create wallet and account.
+	k, err := crypto.HexToECDSA(privateKey)
+	if err != nil {
+		panic(err)
 	}
-	cfg.privateKeys = privateKeys
+	w := swallet.NewWallet(k)
+	acc := crypto.PubkeyToAddress(k.PublicKey)
 
-	// Fix the on-chain addresses of Alice and Bob.
-	addresses := make(map[client.Role]*ethwallet.Address, len(rawKeys))
-	for index, key := range cfg.privateKeys {
-		commonAddress := crypto.PubkeyToAddress(key.PublicKey)
-		addresses[index] = ethwallet.AsWalletAddr(commonAddress)
+	// Create and start client.
+	c, err := client.StartClient(
+		host,
+		w,
+		acc,
+		nodeURL,
+		chainID,
+		contracts.Adjudicator,
+	)
+	if err != nil {
+		panic(err)
 	}
-	cfg.addrs = addresses
-}
 
-// createClientConfig is a helper function for client setup.
-func createClientConfig(nodeURL string, contracts ContractAddresses, privateKey *ecdsa.PrivateKey, host string, peerAddress *ethwallet.Address, peerHost string) client.PaymentClientConfig {
-	return client.PaymentClientConfig{
-		PerunClientConfig: client.PerunClientConfig{
-			PrivateKey:      privateKey,
-			Host:            host,
-			EthNodeURL:      nodeURL,
-			AdjudicatorAddr: contracts.AdjudicatorAddr,
-			AssetHolderAddr: contracts.AssetHolderAddr,
-			DialerTimeout:   1 * time.Second,
-			PeerAddresses: []client.PeerWithAddress{
-				{
-					Peer:    peerAddress,
-					Address: peerHost,
-				},
-			},
-		},
-	}
+	return c
 }

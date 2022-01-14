@@ -15,16 +15,17 @@
 package main
 
 import (
-	"crypto/ecdsa"
+	"context"
 	"fmt"
 	"log"
 	"math/big"
-	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
+	"github.com/ethereum/go-ethereum/crypto"
+	"perun.network/go-perun/backend/ethereum/channel"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/perun-examples/payment-channel/client"
-	"perun.network/perun-examples/payment-channel/eth"
 )
 
 func logAccountBalance(clients ...*client.Client) {
@@ -33,7 +34,7 @@ func logAccountBalance(clients ...*client.Client) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("%s with address %v - Account Balance: %v", c.RoleAsString(), c.Address(), toEth(globalBalance))
+		log.Printf("%s with address %v - Account Balance: %v", c.Name(), c.Address(), toEth(globalBalance))
 	}
 }
 
@@ -41,40 +42,36 @@ func toEth(weiAmount *big.Int) string {
 	return fmt.Sprintf("%vETH", eth.WeiToEth(weiAmount))
 }
 
-//TODO remove?
-func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.PrivateKey, contextTimeout time.Duration) (contracts ContractAddresses, err error) {
-	ethContractClient, err := eth.NewEthContractClient(nodeURL, deploymentKey, chainID, contextTimeout)
+func deployContracts(nodeURL string, chainID uint64, privateKey string) ContractAddresses {
+	k, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
-		err = errors.WithMessage(err, "creating ethereum client")
-		return
+		panic(err)
+	}
+	w := swallet.NewWallet(k)
+	cb, err := client.CreateContractBackend(nodeURL, chainID, w)
+	if err != nil {
+		panic(err)
+	}
+	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
+
+	// Deploy adjudicator.
+	adj, err := channel.DeployAdjudicator(context.TODO(), cb, acc)
+	if err != nil {
+		panic(err)
 	}
 
-	// Deploy adjudicator
-	adjudicatorAddr, txAdj, err := ethContractClient.DeployAdjudicator()
+	// Deploy asset holder.
+	ah, err := channel.DeployETHAssetholder(context.TODO(), cb, adj, acc)
 	if err != nil {
-		err = errors.WithMessage(err, "deploying adjudicator")
-		return
-	}
-
-	// Deploy asset holder
-	assetHolderAddr, txAss, err := ethContractClient.DeployAssetHolderETH(adjudicatorAddr)
-	if err != nil {
-		err = errors.WithMessage(err, "deploying AssetHolderETH")
-		return
-	}
-
-	err = ethContractClient.WaitDeployment(txAdj, txAss)
-	if err != nil {
-		err = errors.WithMessage(err, "waiting for contract deployment")
-		return
+		panic(err)
 	}
 
 	return ContractAddresses{
-		AdjudicatorAddr: adjudicatorAddr,
-		AssetHolderAddr: assetHolderAddr,
-	}, nil
+		Adjudicator: adj,
+		AssetHolder: ah,
+	}
 }
 
 type ContractAddresses struct {
-	AdjudicatorAddr, AssetHolderAddr common.Address
+	Adjudicator, AssetHolder common.Address
 }

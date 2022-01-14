@@ -15,37 +15,98 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"math/big"
+	"time"
 
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
+	"perun.network/go-perun/wire/net"
+	"perun.network/go-perun/wire/net/simple"
+	snet "perun.network/go-perun/wire/net/simple"
 
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"perun.network/perun-examples/payment-channel/eth"
 )
 
-type Client struct {
-	PerunClient *PerunClient
-	Channel     *client.Channel
+const (
+	dialerTimeout   = 10 * time.Second
+	txFinalityDepth = 1
+)
+
+type Network struct {
+	Dialer net.Dialer
+	Bus    *net.Bus
 }
 
-func StartClient(cfg PerunClientConfig) (*Client, error) {
-	perunClient, err := setupPerunClient(cfg)
+type Client struct {
+	PerunClient     *client.Client
+	Dialer          net.Dialer
+	ContractBackend ethchannel.ContractInterface
+
+	// Variables set at runtime.
+	Channel *client.Channel
+}
+
+func StartClient(
+	host string,
+	w *swallet.Wallet,
+	acc common.Address,
+	nodeURL string,
+	chainID uint64,
+	adjudicator common.Address,
+) (*Client, error) {
+	// Create Ethereum client and contract backend.
+	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating Perun client")
+		return nil, fmt.Errorf("creating contract backend: %w", err)
 	}
 
-	c := &Client{
-		PerunClient: perunClient,
-		Channel:     nil,
+	// Validate adjudicator.
+	err = ethchannel.ValidateAdjudicator(context.TODO(), cb, adjudicator)
+	if err != nil {
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
-	go c.PerunClient.StateChClient.Handle(c, c)
-	go c.PerunClient.Bus.Listen(c.PerunClient.Listener)
+	// Setup network environment.
+	waddr := ethwallet.AsWalletAddr(acc)
+	wireAcc := dummyAccount{waddr}
+	dialer := simple.NewTCPDialer(dialerTimeout)
+	listener, err := snet.NewTCPListener(host)
+	if err != nil {
+		return nil, fmt.Errorf("creating listener: %w", err)
+	}
+	bus := net.NewBus(wireAcc, dialer)
+
+	// Setup funder and adjudicator.
+	funder := ethchannel.NewFunder(cb)
+	ethAcc := accounts.Account{Address: acc}
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+
+	// Setup dispute watcher.
+	watcher, err := local.NewWatcher(adj)
+	if err != nil {
+		return nil, fmt.Errorf("intializing watcher: %w", err)
+	}
+
+	// Setup Perun client.
+	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	if err != nil {
+		return nil, errors.WithMessage(err, "creating client")
+	}
+
+	c := &Client{perunClient, dialer, cb, nil}
+
+	go c.PerunClient.Handle(c, c)
+	go bus.Listen(listener)
 
 	return c, nil
 }
@@ -69,11 +130,9 @@ func (c *Client) OpenChannel(peer wallet.Address) error {
 	if err != nil {
 		return fmt.Errorf("creating channel proposal: %w", err)
 	}
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
 
 	// Send the proposal.
-	ch, err := c.PerunClient.StateChClient.ProposeChannel(ctx, proposal)
+	ch, err := c.PerunClient.ProposeChannel(context.TODO(), proposal)
 	c.Channel = ch
 
 	if err != nil {
@@ -87,10 +146,8 @@ func (c *Client) OpenChannel(peer wallet.Address) error {
 func (c *Client) UpdateChannel() error {
 	fmt.Printf("%s: Update channel by sending 5 ETH to %s \n", c.RoleAsString(), c.PeerRoleAsString())
 
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
 	// Use UpdateBy to conveniently update the channels state.
-	return c.Channel.UpdateBy(ctx, func(state *channel.State) error {
+	return c.Channel.UpdateBy(context.TODO(), func(state *channel.State) error {
 		// Shift 5 ETH from caller to peer.
 		amount := eth.EthToWei(big.NewFloat(5))
 		state.Balances[0][1-c.role].Sub(state.Balances[0][1-c.role], amount)
