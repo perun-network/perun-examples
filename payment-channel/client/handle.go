@@ -16,6 +16,7 @@ package client
 
 import (
 	"fmt"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"

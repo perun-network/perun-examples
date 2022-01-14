@@ -17,51 +17,31 @@ package client
 import (
 	"fmt"
 	"math/big"
+
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"perun.network/go-perun/backend/ethereum/bindings/assetholdereth"
 	"perun.network/perun-examples/payment-channel/eth"
 )
 
-type ClientConfig struct {
-	PerunClientConfig
-	ContextTimeout time.Duration
-}
-
 type Client struct {
-	role            Role
-	PerunClient     *PerunClient
-	AssetHolderAddr common.Address
-	AssetHolder     *assetholdereth.AssetHolderETH
-	ContextTimeout  time.Duration
-	Channel         *client.Channel
+	PerunClient *PerunClient
+	Channel     *client.Channel
 }
 
-func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := setupPerunClient(cfg.PerunClientConfig)
+func StartClient(cfg PerunClientConfig) (*Client, error) {
+	perunClient, err := setupPerunClient(cfg)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating perun client")
-	}
-
-	ah, err := assetholdereth.NewAssetHolderETH(cfg.AssetHolderAddr, perunClient.ContractBackend)
-	if err != nil {
-		return nil, errors.WithMessage(err, "loading asset holder")
+		return nil, errors.WithMessage(err, "creating Perun client")
 	}
 
 	c := &Client{
-		cfg.Role,
-		perunClient,
-		cfg.AssetHolderAddr,
-		ah,
-		cfg.ContextTimeout,
-		nil,
+		PerunClient: perunClient,
+		Channel:     nil,
 	}
 
 	go c.PerunClient.StateChClient.Handle(c, c)
@@ -82,7 +62,7 @@ func (c *Client) OpenChannel(peer wallet.Address) error {
 	}
 	// All perun identities that we want to open a channel with. In this case
 	// we use the same on- and off-chain accounts but you could use different.
-	peers := []wire.Address{c.PerunClient.Account.Address(), peer}
+	peers := []wire.Address{c.Addr, peer}
 
 	// Prepare the proposal by defining the channel parameters.
 	proposal, err := client.NewLedgerChannelProposal(10, c.PerunAddress(), initBals, peers)

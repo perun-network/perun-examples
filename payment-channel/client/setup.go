@@ -15,31 +15,30 @@
 package client
 
 import (
-	"crypto/ecdsa"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"perun.network/go-perun/backend/ethereum/channel"
-	"perun.network/go-perun/backend/ethereum/wallet"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
 	"perun.network/go-perun/wire/net"
 	"perun.network/go-perun/wire/net/simple"
 )
 
-type Role int
-
 const (
-	RoleAlice Role = 0
-	RoleBob   Role = 1
+	dialerTimeout   = 10 * time.Second
+	txFinalityDepth = 1
 )
 
 type PeerWithAddress struct {
@@ -47,98 +46,101 @@ type PeerWithAddress struct {
 	Address string
 }
 
+type ContractAddresses struct {
+	AdjudicatorAddr, AssetHolderAddr common.Address
+}
+
 type PerunClientConfig struct {
-	Role            Role
-	PrivateKey      *ecdsa.PrivateKey
-	Host            string
-	ETHNodeURL      string
-	AdjudicatorAddr common.Address
-	AssetHolderAddr common.Address
-	DialerTimeout   time.Duration
-	PeerAddresses   []PeerWithAddress
+	EthNodeURL string
+	Wallet     wallet.Wallet
+	Account    wallet.Account
+	Host       string
+	Contracts  ContractAddresses
+}
+
+type Network struct {
+	Dialer net.Dialer
+	Bus    *net.Bus
 }
 
 type PerunClient struct {
-	Role            Role
 	EthClient       *ethclient.Client
 	StateChClient   *client.Client
-	Bus             *net.Bus
-	Listener        net.Listener
+	Net             Network
 	ContractBackend channel.ContractInterface
-	Wallet          *swallet.Wallet
-	Account         *swallet.Account
 }
 
-func setupPerunClient(cfg PerunClientConfig) (*PerunClient, error) {
-	// Create wallet and account
-	clientWallet := swallet.NewWallet(cfg.PrivateKey)
-	addr := wallet.AsWalletAddr(crypto.PubkeyToAddress(cfg.PrivateKey.PublicKey))
-	pAccount, err := clientWallet.Unlock(addr)
-	if err != nil {
-		panic("failed to create account")
-	}
-	account := pAccount.(*swallet.Account)
-
-	// Create Ethereum client and contract backend
-	signer := types.NewEIP155Signer(big.NewInt(1337))
-	transactor := swallet.NewTransactor(clientWallet, signer)
-
-	ethClient, cb, err := createContractBackend(cfg.ETHNodeURL, transactor)
+func setupPerunClient(
+	host string,
+	w *swallet.Wallet,
+	acc common.Address,
+	nodeURL string,
+	chainID uint64,
+	adjudicator common.Address,
+) (*PerunClient, error) {
+	// Create Ethereum client and contract backend.
+	ethClient, cb, err := createContractBackend(nodeURL, chainID, w)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating contract backend")
 	}
 
-	//REMARK
-	// A client should validate the smart contracts it is using them, if the
-	// given contract addresses come from an untrusted source.
-
-	adjudicator := channel.NewAdjudicator(cb, cfg.AdjudicatorAddr, account.Account.Address, account.Account)
-
-	listener, bus, err := setupNetwork(account, cfg.Host, cfg.PeerAddresses, cfg.DialerTimeout)
-	if err != nil {
-		return nil, errors.WithMessage(err, "setting up network")
+	// Setup network environment.
+	waddr := ethwallet.AsWalletAddr(acc)
+	wireAcc := dummyAccount{waddr}
+	dialer := simple.NewTCPDialer(dialerTimeout)
+	bus := net.NewBus(wireAcc, dialer)
+	network := Network{
+		Dialer: dialer,
+		Bus:    bus,
 	}
 
-	funder := createFunder(cb, account.Account, cfg.AssetHolderAddr)
+	// Setup funder and adjudicator.
+	funder := channel.NewFunder(cb)
+	ethAcc := accounts.Account{Address: acc}
+	adj := channel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
 
-	stateChClient, err := client.New(account.Address(), bus, funder, adjudicator, clientWallet)
+	// Setup dispute watcher.
+	watcher, err := local.NewWatcher(adj)
+	if err != nil {
+		return nil, fmt.Errorf("intializing watcher: %w", err)
+	}
+
+	// Setup Perun client.
+	c, err := client.New(waddr, bus, funder, adj, w, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
-	return &PerunClient{cfg.Role, ethClient, stateChClient, bus, listener, cb, clientWallet, account}, nil
+	return &PerunClient{ethClient, c, network, cb}, nil
 }
 
-func createContractBackend(nodeURL string, transactor channel.Transactor) (*ethclient.Client, channel.ContractBackend, error) {
+func createContractBackend(
+	nodeURL string,
+	chainID uint64,
+	w *swallet.Wallet,
+) (*ethclient.Client, channel.ContractBackend, error) {
+	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
+	transactor := swallet.NewTransactor(w, signer) //TODO transactor should be spawnable from Wallet: Add method "NewTransactor"
+
 	ethClient, err := ethclient.Dial(nodeURL)
 	if err != nil {
-		return nil, channel.ContractBackend{}, nil
+		return nil, channel.ContractBackend{}, err
 	}
 
-	return ethClient, channel.NewContractBackend(ethClient, transactor), nil
+	return ethClient, channel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-func setupNetwork(account wire.Account, host string, peerAddresses []PeerWithAddress, dialerTimeout time.Duration) (listener net.Listener, bus *net.Bus, err error) {
-	dialer := simple.NewTCPDialer(dialerTimeout)
-
-	for _, pa := range peerAddresses {
-		dialer.Register(pa.Peer, pa.Address)
-	}
-
-	listener, err = simple.NewTCPListener(host)
-	if err != nil {
-		err = fmt.Errorf("creating listener: %w", err)
-		return
-	}
-
-	bus = net.NewBus(account, dialer)
-	return listener, bus, nil
+type dummyAccount struct {
+	addr wire.Address
 }
 
-func createFunder(cb channel.ContractBackend, account accounts.Account, assetHolder common.Address) *channel.Funder {
-	f := channel.NewFunder(cb)
-	asset := wallet.Address(assetHolder)
-	depositor := new(channel.ETHDepositor)
-	f.RegisterAsset(asset, depositor, account)
-	return f
+// Address used by this account.
+func (a dummyAccount) Address() wallet.Address {
+	return a.addr
+}
+
+// SignData requests a signature from this account.
+// It returns the signature or an error.
+func (a dummyAccount) SignData(data []byte) ([]byte, error) {
+	panic("unsupported")
 }

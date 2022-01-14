@@ -16,103 +16,59 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
-	"math/big"
 	"time"
 
-	"perun.network/go-perun/backend/ethereum/wallet"
+	"github.com/ethereum/go-ethereum/crypto"
+
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
-type config struct {
-	chainURL              string                            // Url of the Ethereum node.
-	chainID               *big.Int                          // ID of the targeted chain
-	hosts                 map[client.Role]string            // Hosts for incoming connections.
-	privateKeys           map[client.Role]*ecdsa.PrivateKey // Private keys.
-	addrs                 map[client.Role]*wallet.Address   // Wallet addresses.
-	defaultContextTimeout time.Duration                     // Default time for timeout
-}
+const (
+	chainURL              = "ws://127.0.0.1:8545"
+	chainID               = 1337
+	defaultContextTimeout = 15 * time.Second
+	deploymentKey         = "" // Key used for contract deployment. //TODO insert key
 
-var cfg config
+	// Alice
+	hostAlice = "0.0.0.0:8401"
+	keyAlice  = "1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
 
-// main performs the opening, updating and closing of a simple perun payment channel
+	// Bob
+	hostBob = "0.0.0.0:8402"
+	keyBob  = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+)
+
 func main() {
-	alice, bob := setup()
+	contracts := deployContracts(chainURL, privateKey) //TODO
+
+	alice := setupClient(hostAlice, keyAlice, chainURL, contracts)
+	bob := setupClient(hostBob, keyBob, chainURL, contracts)
+
 	logAccountBalance(alice, bob)
 
-	if err := bob.OpenChannel(cfg.addrs[client.RoleAlice]); err != nil {
-		panic(fmt.Errorf("opening channel: %w", err))
-	}
-	if err := bob.UpdateChannel(); err != nil {
-		panic(fmt.Errorf("updating channel: %w", err))
-	}
-	if err := bob.CloseChannel(); err != nil {
-		panic(fmt.Errorf("closing channel: %w", err))
-	}
+	alice.OpenChannel()
+	alice.UpdateChannel()
+	bob.UpdateChannel()
+	bob.CloseChannel()
 
 	logAccountBalance(alice, bob)
 }
 
-// setup creates the two clients Alice and Bob
-func setup() (*client.Client, *client.Client) {
-	initConfig()
-
-	// Deploy contracts (Bob deploys)
-	fmt.Println("Deploying contracts...")
-	nodeURL := cfg.chainURL
-	contracts, err := deployContracts(nodeURL, cfg.chainID, cfg.privateKeys[client.RoleBob], cfg.defaultContextTimeout)
-	if err != nil {
-		panic(fmt.Errorf("deploying contracts: %v", err))
-	}
-
-	fmt.Println("Setting up clients...")
-	// Setup Alice
-	clientConfig1 := createClientConfig(
-		client.RoleAlice, nodeURL, contracts,
-		cfg.privateKeys[client.RoleAlice], cfg.hosts[client.RoleAlice],
-		cfg.addrs[client.RoleBob], cfg.hosts[client.RoleBob],
-	)
-
-	c1, err := client.StartClient(clientConfig1)
-	if err != nil {
-		panic(fmt.Errorf("alice setup: %v", err))
-	}
-
-	// Setup Bob
-	clientConfig2 := createClientConfig(
-		client.RoleBob, nodeURL, contracts,
-		cfg.privateKeys[client.RoleBob], cfg.hosts[client.RoleBob],
-		cfg.addrs[client.RoleAlice], cfg.hosts[client.RoleAlice],
-	)
-
-	c2, err := client.StartClient(clientConfig2)
-
-	if err != nil {
-		panic(fmt.Errorf("bob setup: %v", err))
-	}
-	fmt.Println("Setup done.")
+// setupClient sets up a new client with the given parameters.
+func setupClient(
+	nodeURL string,
+	contracts ContractAddresses,
+	host string,
+	privateKey string,
+) *client.Client {
+	c, err := client.StartClient(clientConfig)
 
 	return c1, c2
 }
 
 // initConfig initializes the config for a test run via ganache-cli
 func initConfig() {
-	cfg.chainURL = "ws://127.0.0.1:8545"
-	cfg.chainID = big.NewInt(1337)
-	cfg.hosts = map[client.Role]string{
-		client.RoleAlice: "0.0.0.0:8400",
-		client.RoleBob:   "0.0.0.0:8401",
-	}
-
-	cfg.defaultContextTimeout = 15 * time.Second
-
-	// convert the private key strings ...
-	rawKeys := []string{
-		"1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f", // Alice
-		"f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e", // Bob
-	}
-
 	// ... to ECDSA keys:
 	privateKeys := make(map[client.Role]*ecdsa.PrivateKey, len(rawKeys))
 	for index, key := range rawKeys {
@@ -122,22 +78,21 @@ func initConfig() {
 	cfg.privateKeys = privateKeys
 
 	// Fix the on-chain addresses of Alice and Bob.
-	addresses := make(map[client.Role]*wallet.Address, len(rawKeys))
+	addresses := make(map[client.Role]*ethwallet.Address, len(rawKeys))
 	for index, key := range cfg.privateKeys {
 		commonAddress := crypto.PubkeyToAddress(key.PublicKey)
-		addresses[index] = wallet.AsWalletAddr(commonAddress)
+		addresses[index] = ethwallet.AsWalletAddr(commonAddress)
 	}
 	cfg.addrs = addresses
 }
 
 // createClientConfig is a helper function for client setup.
-func createClientConfig(role client.Role, nodeURL string, contracts ContractAddresses, privateKey *ecdsa.PrivateKey, host string, peerAddress *wallet.Address, peerHost string) client.ClientConfig {
-	return client.ClientConfig{
+func createClientConfig(nodeURL string, contracts ContractAddresses, privateKey *ecdsa.PrivateKey, host string, peerAddress *ethwallet.Address, peerHost string) client.PaymentClientConfig {
+	return client.PaymentClientConfig{
 		PerunClientConfig: client.PerunClientConfig{
-			Role:            role,
 			PrivateKey:      privateKey,
 			Host:            host,
-			ETHNodeURL:      nodeURL,
+			EthNodeURL:      nodeURL,
 			AdjudicatorAddr: contracts.AdjudicatorAddr,
 			AssetHolderAddr: contracts.AssetHolderAddr,
 			DialerTimeout:   1 * time.Second,
@@ -148,6 +103,5 @@ func createClientConfig(role client.Role, nodeURL string, contracts ContractAddr
 				},
 			},
 		},
-		ContextTimeout: cfg.defaultContextTimeout,
 	}
 }

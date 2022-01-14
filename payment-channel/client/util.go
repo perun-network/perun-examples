@@ -15,23 +15,19 @@
 package client
 
 import (
-	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 	"perun.network/go-perun/wallet"
 )
 
 func (c *Client) PerunAddress() wallet.Address {
-	return c.PerunClient.Account.Address()
+	return ethwallet.
 }
 
 func (c *Client) Address() common.Address {
 	return c.PerunClient.Account.Account.Address
-}
-
-func (c *Client) defaultContextWithTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), c.ContextTimeout)
 }
 
 func (c *Client) Logf(format string, v ...interface{}) {

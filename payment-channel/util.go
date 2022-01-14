@@ -41,6 +41,7 @@ func toEth(weiAmount *big.Int) string {
 	return fmt.Sprintf("%vETH", eth.WeiToEth(weiAmount))
 }
 
+//TODO remove?
 func deployContracts(nodeURL string, chainID *big.Int, deploymentKey *ecdsa.PrivateKey, contextTimeout time.Duration) (contracts ContractAddresses, err error) {
 	ethContractClient, err := eth.NewEthContractClient(nodeURL, deploymentKey, chainID, contextTimeout)
 	if err != nil {
