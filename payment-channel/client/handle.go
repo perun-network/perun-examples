@@ -113,6 +113,9 @@ func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO pro
 		ch := c.channels[e.ID()]
 		c.channelsMtx.RUnlock()
 
-		ch.Close()
+		err := ch.ch.Settle(context.TODO(), false)
+		if err != nil {
+			panic(err)
+		}
 	}
 }

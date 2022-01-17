@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
@@ -37,13 +36,13 @@ const (
 func main() {
 	// Setup environment.
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
-	asset := ethwallet.AsWalletAddr(assetHolder) // Convert to wallet.Address, which implements channel.Asset. //TODO create ethchannel.AsAsset
+	asset := client.NewAsset(assetHolder) // Convert to wallet.Address, which implements channel.Asset. //TODO create ethchannel.AsAsset
 	l := newBalanceLogger(chainURL)
 
 	// Setup clients.
 	bus := wire.NewLocalBus() // Setup bus for off-chain communication.	//TODO add tutorial that explains tcp/ip bus.
-	alice := startClient("Alice", bus, chainURL, adjudicator, keyAlice)
-	bob := startClient("Bob", bus, chainURL, adjudicator, keyBob)
+	alice := startClient("Alice", bus, chainURL, adjudicator, assetHolder, keyAlice)
+	bob := startClient("Bob", bus, chainURL, adjudicator, assetHolder, keyBob)
 
 	l.LogBalances(alice, bob) // Print balances before transactions.
 
@@ -64,7 +63,7 @@ func startClient(
 	name string,
 	bus wire.Bus,
 	nodeURL string,
-	adjudicator common.Address,
+	adjudicator, assetHolder common.Address,
 	privateKey string,
 ) *client.Client {
 	// Create wallet and account.
@@ -84,6 +83,7 @@ func startClient(
 		nodeURL,
 		chainID,
 		adjudicator,
+		assetHolder,
 	)
 	if err != nil {
 		panic(err)

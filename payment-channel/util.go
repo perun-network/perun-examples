@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"perun.network/go-perun/backend/ethereum/channel"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	"perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/perun-examples/payment-channel/client"
@@ -64,13 +64,13 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
 
 	// Deploy adjudicator.
-	adj, err = channel.DeployAdjudicator(context.TODO(), cb, acc) //TODO accept ethwallet Account instead?
+	adj, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc) //TODO accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}
 
 	// Deploy asset holder.
-	ah, err = channel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO accept ethwallet Account instead?
+	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}

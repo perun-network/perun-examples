@@ -44,6 +44,7 @@ type Client struct { //TODO add coments to variables?
 	Name            string
 	PerunClient     *client.Client
 	ContractBackend ethchannel.ContractInterface
+	Funder          *ethchannel.Funder
 	Adjudicator     common.Address
 	AccountAddress  wallet.Address
 	channels        map[channel.ID]*Channel
@@ -58,6 +59,7 @@ func StartClient(
 	nodeURL string,
 	chainID uint64,
 	adjudicator common.Address,
+	assetHolder common.Address,
 ) (*Client, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -65,15 +67,24 @@ func StartClient(
 		return nil, fmt.Errorf("creating contract backend: %w", err)
 	}
 
-	// Validate adjudicator.
+	// Validate contracts.
 	err = ethchannel.ValidateAdjudicator(context.TODO(), cb, adjudicator)
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, assetHolder, adjudicator)
+	if err != nil {
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
+	}
 
-	// Setup funder and adjudicator.
+	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
+	asset := *NewAsset(assetHolder)
+	dep := ethchannel.NewETHDepositor()
 	ethAcc := accounts.Account{Address: acc}
+	funder.RegisterAsset(asset, dep, ethAcc)
+
+	// Setup adjudicator.
 	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
 
 	// Setup dispute watcher.
@@ -94,6 +105,7 @@ func StartClient(
 		Name:            name,
 		PerunClient:     perunClient,
 		ContractBackend: cb,
+		Funder:          funder,
 		Adjudicator:     adjudicator,
 		AccountAddress:  waddr,
 		channels:        map[channel.ID]*Channel{},
@@ -108,13 +120,6 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 	participants := []wire.Address{c.AccountAddress, peer.AccountAddress}
-
-	// We verify the asset holder contract.
-	ethAsset := common.Address(*asset.(*ethwallet.Address))
-	err := ethchannel.ValidateAssetHolderETH(context.TODO(), c.ContractBackend, ethAsset, c.Adjudicator)
-	if err != nil {
-		panic(err) //TODO return error instead of panic?
-	}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, asset) //TODO Create issue: init the balances to zero.
