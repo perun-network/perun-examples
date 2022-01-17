@@ -15,45 +15,49 @@
 package client
 
 import (
+	"context"
 	"fmt"
+	"math/big"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
+	perunio "perun.network/go-perun/pkg/io"
 )
 
-func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *client.ProposalResponder) {
-	// Check that we got a ledger channel proposal.
-	_proposal, ok := proposal.(*client.LedgerChannelProposal)
+func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
+	// Ensure that we got a ledger channel proposal.
+	lcp, ok := p.(*client.LedgerChannelProposal)
 	if !ok {
-		fmt.Printf("%s: Received a proposal that was not for a ledger channel.", c.RoleAsString())
+		fmt.Printf("Wrong channel proposal type: %T\n", p)
 		return
 	}
-	fmt.Printf("%s: Received channel proposal\n", c.RoleAsString())
 
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	// Create a channel accept message and send it.
-	accept := _proposal.Accept(c.PerunAddress(), client.WithRandomNonce())
-	ch, err := responder.Accept(ctx, accept)
-
-	if err != nil {
-		fmt.Printf("%s: Accepting channel: %w\n", c.RoleAsString(), err)
-	} else {
-		fmt.Printf("%s: Accepted channel with id 0x%x\n", c.RoleAsString(), ch.ID())
+	// Check that our balance is 0.
+	perunio.EqualEncoding(c.asset, p.Base().InitBals.Assets) //TODO check correct assets. (one asset with correct address)
+	initBal := lcp.FundingAgreement[assetIdx][partIdx]
+	if initBal.Cmp(big.NewInt(0)) != 0 {
+		fmt.Printf("Wrong initial balance: %v\n", initBal)
+		return
 	}
 
-	c.HandleNewChannel(ch) // TODO: 1/2 Check with MG why this is needed here (and not needed in App Channel example)
+	// Create a channel accept message and send it.
+	accept := lcp.Accept(
+		c.AccountAddress,         // The account we use in the channel.
+		client.WithRandomNonce(), // Our share of the channel nonce.
+	)
+	ch, err := r.Accept(context.TODO(), accept)
+	if err != nil {
+		fmt.Printf("Error accepting channel proposal: %v\n", err)
+		return
+	}
+
+	c.HandleNewChannel(ch)
 }
 
 func (c *Client) HandleUpdate(state *channel.State, update client.ChannelUpdate, responder *client.UpdateResponder) {
-	fmt.Printf("%s: HandleUpdate\n", c.RoleAsString())
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	// We will accept every update
-	if err := responder.Accept(ctx); err != nil {
+	// We will accept every update that increases our balance.
+	if err := responder.Accept(context.TODO()); err != nil {
 		fmt.Printf("%s: Could not accept update: %v\n", c.RoleAsString(), err)
 	}
 }

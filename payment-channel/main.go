@@ -15,8 +15,7 @@
 package main
 
 import (
-	"time"
-
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
@@ -24,43 +23,41 @@ import (
 )
 
 const (
-	chainURL              = "ws://127.0.0.1:8545"
-	chainID               = 1337
-	defaultContextTimeout = 15 * time.Second
-	deploymentKey         = "" // Key used for contract deployment. //TODO insert key
+	chainURL = "ws://127.0.0.1:8545"
+	chainID  = 1337
 
-	// Alice
-	hostAlice = "0.0.0.0:8401"
-	keyAlice  = "1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
-
-	// Bob
-	hostBob = "0.0.0.0:8402"
-	keyBob  = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+	// Private keys.
+	keyDeployment = "" // Key used for contract deployment. //TODO insert key
+	keyAlice      = "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+	keyBob        = "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
 func main() {
-	contracts := deployContracts(chainURL, chainID, deploymentKey)
+	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployment)
 
-	alice := startClient(chainURL, contracts, hostAlice, keyAlice)
-	bob := startClient(chainURL, contracts, hostBob, keyBob)
+	alice := startClient(chainURL, adjudicator, keyAlice)
+	bob := startClient(chainURL, adjudicator, keyBob)
 
-	logAccountBalance(alice, bob)
+	printAccountBalance(alice, bob) // Print account balances before channel transactions.
 
 	//TODO validate asset holder when proposing a new channel or receiving a channel proposal.
 
-	alice.OpenChannel()
-	alice.UpdateChannel()
-	bob.UpdateChannel()
-	bob.CloseChannel()
+	ch := alice.OpenChannel(bob, assetHolder, 10)
+	ch.SendPayment(3)
+	ch.SendPayment(2)
+	ch.SendPayment(1)
+	ch.Close()
 
-	logAccountBalance(alice, bob)
+	printAccountBalance(alice, bob) // Print account balances after channel transactions.
+
+	alice.Shutdown()
+	bob.Shutdown()
 }
 
 // startClient sets up a new client with the given parameters.
 func startClient(
 	nodeURL string,
-	contracts ContractAddresses,
-	host string,
+	adjudicator common.Address,
 	privateKey string,
 ) *client.Client {
 	// Create wallet and account.
@@ -73,12 +70,11 @@ func startClient(
 
 	// Create and start client.
 	c, err := client.StartClient(
-		host,
 		w,
 		acc,
 		nodeURL,
 		chainID,
-		contracts.Adjudicator,
+		adjudicator,
 	)
 	if err != nil {
 		panic(err)

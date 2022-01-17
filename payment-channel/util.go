@@ -28,7 +28,7 @@ import (
 	"perun.network/perun-examples/payment-channel/client"
 )
 
-func logAccountBalance(clients ...*client.Client) {
+func printAccountBalance(clients ...*client.Client) {
 	for _, c := range clients {
 		globalBalance, err := c.OnChainBalance()
 		if err != nil {
@@ -42,7 +42,7 @@ func toEth(weiAmount *big.Int) string {
 	return fmt.Sprintf("%vETH", eth.WeiToEth(weiAmount))
 }
 
-func deployContracts(nodeURL string, chainID uint64, privateKey string) ContractAddresses {
+func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah common.Address) {
 	k, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
 		panic(err)
@@ -55,23 +55,16 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) Contract
 	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
 
 	// Deploy adjudicator.
-	adj, err := channel.DeployAdjudicator(context.TODO(), cb, acc)
+	adj, err = channel.DeployAdjudicator(context.TODO(), cb, acc)
 	if err != nil {
 		panic(err)
 	}
 
 	// Deploy asset holder.
-	ah, err := channel.DeployETHAssetholder(context.TODO(), cb, adj, acc)
+	ah, err = channel.DeployETHAssetholder(context.TODO(), cb, adj, acc)
 	if err != nil {
 		panic(err)
 	}
 
-	return ContractAddresses{
-		Adjudicator: adj,
-		AssetHolder: ah,
-	}
-}
-
-type ContractAddresses struct {
-	Adjudicator, AssetHolder common.Address
+	return adj, ah
 }

@@ -28,9 +28,6 @@ import (
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"perun.network/go-perun/wire/net"
-	"perun.network/go-perun/wire/net/simple"
-	snet "perun.network/go-perun/wire/net/simple"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -42,22 +39,14 @@ const (
 	txFinalityDepth = 1
 )
 
-type Network struct {
-	Dialer net.Dialer
-	Bus    *net.Bus
-}
-
 type Client struct {
 	PerunClient     *client.Client
-	Dialer          net.Dialer
 	ContractBackend ethchannel.ContractInterface
-
-	// Variables set at runtime.
-	Channel *client.Channel
+	Adjudicator     common.Address
+	AccountAddress  wallet.Address
 }
 
 func StartClient(
-	host string,
 	w *swallet.Wallet,
 	acc common.Address,
 	nodeURL string,
@@ -76,15 +65,10 @@ func StartClient(
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
-	// Setup network environment.
+	// Setup message bus.
 	waddr := ethwallet.AsWalletAddr(acc)
-	wireAcc := dummyAccount{waddr}
-	dialer := simple.NewTCPDialer(dialerTimeout)
-	listener, err := snet.NewTCPListener(host)
-	if err != nil {
-		return nil, fmt.Errorf("creating listener: %w", err)
-	}
-	bus := net.NewBus(wireAcc, dialer)
+	bus := wire.NewLocalBus()
+	// TODO add tutorial that explains tcp/ip bus.
 
 	// Setup funder and adjudicator.
 	funder := ethchannel.NewFunder(cb)
@@ -103,75 +87,94 @@ func StartClient(
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
-	c := &Client{perunClient, dialer, cb, nil}
-
-	go c.PerunClient.Handle(c, c)
-	go bus.Listen(listener)
+	// Create client and start request handler.
+	c := &Client{
+		perunClient,
+		cb,
+		adjudicator,
+		waddr,
+	}
+	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *Client) OpenChannel(peer wallet.Address) error {
-	fmt.Printf("%s: Opening channel from %s to %s\n", c.RoleAsString(), c.RoleAsString(), c.PeerRoleAsString())
-	// Alice and Bob will both start with 10 ETH.
-	initBal := eth.EthToWei(big.NewFloat(10))
-	// Perun needs an initial allocation which defines the balances of all
-	// participants. The same structure is used for multi-asset channels.
-	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{ethwallet.AsWalletAddr(c.AssetHolderAddr)},
-		Balances: [][]*big.Int{{initBal, initBal}},
-	}
-	// All perun identities that we want to open a channel with. In this case
-	// we use the same on- and off-chain accounts but you could use different.
-	peers := []wire.Address{c.Addr, peer}
+func (c *Client) OpenChannel(peer *Client, asset common.Address, amount uint64) Channel {
+	// We define the channel participants. The proposer always has index 0. Here
+	// we use the on-chain addresses as off-chain addresses, but we could also
+	// use different ones.
+	participants := []wire.Address{c.AccountAddress, peer.AccountAddress}
 
-	// Prepare the proposal by defining the channel parameters.
-	proposal, err := client.NewLedgerChannelProposal(10, c.PerunAddress(), initBals, peers)
+	// We verify the asset holder contract.
+	err := ethchannel.ValidateAssetHolderETH(context.TODO(), c.ContractBackend, asset, c.Adjudicator)
 	if err != nil {
-		return fmt.Errorf("creating channel proposal: %w", err)
+		panic(err)
+	}
+
+	// We create an initial allocation which defines the starting balances.
+	ethAsset := ethwallet.AsWalletAddr(asset)       // Convert to wallet.Address, which implements Asset. //TODO create ethchannel.AsAsset
+	initAlloc := channel.NewAllocation(2, ethAsset) //TODO Create issue: init the balances to zero.
+	initAlloc.SetAssetBalances(ethAsset, []channel.Bal{
+		new(big.Int).SetUint64(amount), // Our initial balance.
+		big.NewInt(0),                  // Peer's initial balance.
+	})
+
+	// Prepare the channel proposal by defining the channel parameters.
+	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
+	proposal, err := client.NewLedgerChannelProposal(
+		challengeDuration,
+		c.AccountAddress,
+		initAlloc,
+		participants,
+	)
+	if err != nil {
+		panic(err)
 	}
 
 	// Send the proposal.
 	ch, err := c.PerunClient.ProposeChannel(context.TODO(), proposal)
-	c.Channel = ch
-
 	if err != nil {
-		return fmt.Errorf("proposing channel: %w", err)
+		panic(err)
 	}
 
-	fmt.Printf("\n 🎉 Opened channel with id 0x%x \n\n", ch.ID())
-	return nil
+	return Channel{ch: ch}
 }
 
-func (c *Client) UpdateChannel() error {
-	fmt.Printf("%s: Update channel by sending 5 ETH to %s \n", c.RoleAsString(), c.PeerRoleAsString())
+type Channel struct {
+	ch    *client.Channel
+	asset channel.Asset
+}
 
-	// Use UpdateBy to conveniently update the channels state.
-	return c.Channel.UpdateBy(context.TODO(), func(state *channel.State) error {
-		// Shift 5 ETH from caller to peer.
-		amount := eth.EthToWei(big.NewFloat(5))
-		state.Balances[0][1-c.role].Sub(state.Balances[0][1-c.role], amount)
-		state.Balances[0][c.role].Add(state.Balances[0][c.role], amount)
-		// Finalize the channel, this will be important in the next step.
+//TODO document all exported functions.
+func (c Channel) SendPayment(amount uint64) {
+	// Transfer the given amount from us to peer.
+	// Use UpdateBy to update the channel state.
+	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { //TODO we always use context.TODO for simplicity.
+		ethAmount := new(big.Int).SetUint64(amount)
+		state.Allocation.TransferBalance(0, 1, c.asset, ethAmount)
+		return nil
+	})
+	if err != nil {
+		panic(err) //TODO mention that we always panic on error for simplicity.
+	}
+}
+
+func (c Channel) Close() {
+	// Finalize the channel to enable fast settlement.
+	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
 		state.IsFinal = true
 		return nil
 	})
-}
-
-func (c *Client) CloseChannel() error {
-	fmt.Printf("%s: Close Channel \n", c.RoleAsString())
-
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	// .Settle() "closes" the channel (= concludes the channel and withdraws the funds)
-	if err := c.Channel.Settle(ctx, false); err != nil {
-		return fmt.Errorf("settling channel: %w", err)
+	if err != nil {
+		panic(err)
 	}
 
-	// .Close() terminates the local channel object (frees resources) and has nothing to do with the go-perun channel protocol.
-	if err := c.Channel.Close(); err != nil {
-		return fmt.Errorf("closing channel object: %w", err)
+	// Settle concludes the channel and withdraws the funds.
+	err = c.ch.Settle(context.TODO(), false)
+	if err != nil {
+		panic(err)
 	}
-	return nil
+
+	// Close frees up channel resources.
+	c.ch.Close()
 }
