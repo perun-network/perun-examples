@@ -16,30 +16,39 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"perun.network/go-perun/backend/ethereum/channel"
+	"perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
-func printAccountBalance(clients ...*client.Client) {
+type balanceLogger struct {
+	ethClient *ethclient.Client
+}
+
+func newBalanceLogger(chainURL string) balanceLogger {
+	c, err := ethclient.Dial(chainURL)
+	if err != nil {
+		panic(err)
+	}
+	return balanceLogger{ethClient: c}
+}
+
+func (l balanceLogger) LogBalances(clients ...*client.Client) {
 	for _, c := range clients {
-		globalBalance, err := c.OnChainBalance()
+		addr := common.Address(*c.AccountAddress.(*wallet.Address))
+		bal, err := l.ethClient.BalanceAt(context.TODO(), addr, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("%s with address %v - Account Balance: %v", c.Name(), c.Address(), toEth(globalBalance))
+		log.Printf("Balance of %v: %v", c.Name, bal)
 	}
-}
-
-func toEth(weiAmount *big.Int) string {
-	return fmt.Sprintf("%vETH", eth.WeiToEth(weiAmount))
 }
 
 func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah common.Address) {
@@ -55,13 +64,13 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
 
 	// Deploy adjudicator.
-	adj, err = channel.DeployAdjudicator(context.TODO(), cb, acc)
+	adj, err = channel.DeployAdjudicator(context.TODO(), cb, acc) //TODO accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}
 
 	// Deploy asset holder.
-	ah, err = channel.DeployETHAssetholder(context.TODO(), cb, adj, acc)
+	ah, err = channel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}

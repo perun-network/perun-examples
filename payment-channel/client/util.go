@@ -15,14 +15,14 @@
 package client
 
 import (
+	"fmt"
+	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"perun.network/go-perun/backend/ethereum/channel"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
-	"perun.network/go-perun/wallet"
-	"perun.network/go-perun/wire"
 )
 
 func CreateContractBackend(
@@ -41,18 +41,6 @@ func CreateContractBackend(
 	return channel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-// dummyAccount represents a wire account that does not support data signing.
-type dummyAccount struct {
-	addr wire.Address
-}
-
-// Address used by this account.
-func (a dummyAccount) Address() wallet.Address {
-	return a.addr
-}
-
-// SignData requests a signature from this account.
-// It returns the signature or an error.
-func (a dummyAccount) SignData(data []byte) ([]byte, error) {
-	panic("unsupported")
+func (c *Client) Logf(format string, v ...interface{}) {
+	log.Printf("%v: %s", c.Name, fmt.Sprintf(format, v...))
 }

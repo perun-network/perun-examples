@@ -18,7 +18,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
@@ -27,28 +29,31 @@ const (
 	chainID  = 1337
 
 	// Private keys.
-	keyDeployment = "" // Key used for contract deployment. //TODO insert key
-	keyAlice      = "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
-	keyBob        = "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+	keyDeployer = "79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+	keyAlice    = "1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
 func main() {
-	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployment)
+	// Setup environment.
+	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
+	asset := ethwallet.AsWalletAddr(assetHolder) // Convert to wallet.Address, which implements channel.Asset. //TODO create ethchannel.AsAsset
+	l := newBalanceLogger(chainURL)
 
-	alice := startClient(chainURL, adjudicator, keyAlice)
-	bob := startClient(chainURL, adjudicator, keyBob)
+	// Setup clients.
+	bus := wire.NewLocalBus() // Setup bus for off-chain communication.	//TODO add tutorial that explains tcp/ip bus.
+	alice := startClient("Alice", bus, chainURL, adjudicator, keyAlice)
+	bob := startClient("Bob", bus, chainURL, adjudicator, keyBob)
 
-	printAccountBalance(alice, bob) // Print account balances before channel transactions.
+	l.LogBalances(alice, bob) // Print balances before transactions.
 
-	//TODO validate asset holder when proposing a new channel or receiving a channel proposal.
-
-	ch := alice.OpenChannel(bob, assetHolder, 10)
-	ch.SendPayment(3)
-	ch.SendPayment(2)
-	ch.SendPayment(1)
+	ch := alice.OpenChannel(bob, asset, 10)
+	ch.SendPayment(asset, 3)
+	ch.SendPayment(asset, 2)
+	ch.SendPayment(asset, 1)
 	ch.Close()
 
-	printAccountBalance(alice, bob) // Print account balances after channel transactions.
+	l.LogBalances(alice, bob) // Print balances after transactions.
 
 	alice.Shutdown()
 	bob.Shutdown()
@@ -56,6 +61,8 @@ func main() {
 
 // startClient sets up a new client with the given parameters.
 func startClient(
+	name string,
+	bus wire.Bus,
 	nodeURL string,
 	adjudicator common.Address,
 	privateKey string,
@@ -70,6 +77,8 @@ func startClient(
 
 	// Create and start client.
 	c, err := client.StartClient(
+		name,
+		bus,
 		w,
 		acc,
 		nodeURL,

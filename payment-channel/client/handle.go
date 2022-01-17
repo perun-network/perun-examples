@@ -21,27 +21,25 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
-	"perun.network/go-perun/log"
 )
-
-const proposerIdx = 0 //TODO go-perun: expose channel.ProposerIdx
 
 func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
 	// Ensure that we got a ledger channel proposal.
 	lcp, ok := p.(*client.LedgerChannelProposal)
 	if !ok {
 		fmt.Printf("Wrong channel proposal type: %T\n", p)
-		r.Reject(context.TODO(), "Invalid proposal type.")
+		r.Reject(context.TODO(), "Invalid proposal type.") //nolint:errcheck // It's OK if rejection fails.
 		return
 	}
 
 	// Check that we do not need to fund anything.
+	//TODO simplify
 	zeroBal := big.NewInt(0)
 	for _, bals := range lcp.FundingAgreement {
 		for i, bal := range bals {
 			if i != proposerIdx && bal.Cmp(zeroBal) != 0 {
 				fmt.Printf("Expected funding balance 0, got %v\n", bal)
-				r.Reject(context.TODO(), "Invalid funding agreement.")
+				r.Reject(context.TODO(), "Invalid funding agreement.") //nolint:errcheck // It's OK if rejection fails.
 				return
 			}
 		}
@@ -58,26 +56,41 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 		return
 	}
 
-	c.startWatcher(ch)
+	// Store channel.
+	c.channelsMtx.Lock()
+	c.channels[ch.ID()] = newChannel(ch)
+	c.channelsMtx.Unlock()
+
+	// Start the on-chain event watcher. It automatically handles disputes.
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			// Panic because if the watcher is not running, we are no longer
+			// protected against registration of old states.
+			panic(fmt.Sprintf("Watcher returned with error: %v", err))
+		}
+	}()
 }
 
 func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
 	// We accept every update that increases our balance.
 
 	// Ensure that the assets did not change.
+	//TODO check if this is not already checked by go-perun?
 	err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets)
 	if err != nil {
-		r.Reject(context.TODO(), "Invalid assets.")
+		r.Reject(context.TODO(), "Invalid assets.") //nolint:errcheck // It's OK if rejection fails.
 		return
 	}
 
 	// Ensure that our balance has increased.
-	err = next.State.Balances.AssertGreaterOrEqual(cur.Balances)
+	//TODO comment: go-perun ensures that total balance stays the same.
+	//TODO simplify
 	for i, bals := range next.State.Balances {
 		for j, nextBal := range bals {
 			curBal := cur.Balances[i][j]
 			if i != proposerIdx && nextBal.Cmp(curBal) > 0 {
-				r.Reject(context.TODO(), "Invalid balances.")
+				r.Reject(context.TODO(), "Invalid balances.") //nolint:errcheck // It's OK if rejection fails.
 				return
 			}
 		}
@@ -86,28 +99,20 @@ func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *
 	// Send the acceptance message.
 	err = r.Accept(context.TODO())
 	if err != nil {
-		fmt.Printf("Error accepting update: %v\n", err)
+		c.Logf("Error accepting update: %v\n", err)
 		return
 	}
 }
 
-func (c *Client) startWatcher(ch *client.Channel) {
-	go func() {
-		err := ch.Watch(c)
-		if err != nil {
-			// Panic because if the watcher is not running, we are no longer
-			// protected against registration of old states.
-			panic("Watcher returned with error: %v", err)
-		}
-	}()
-}
+func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO provide channel with event. expose channel registry?
+	c.Logf("Received Adjudicator event: %T", e)
 
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO provide channel with event.
-	c.Log("Received Adjudicator event: %T", e)
-	if _, ok := e.(*channel.ConcludedEvent); ok {
-		err := c.CloseChannel()
-		if err != nil {
-			log.Error(err)
-		}
+	switch e := e.(type) {
+	case *channel.ConcludedEvent:
+		c.channelsMtx.RLock()
+		ch := c.channels[e.ID()]
+		c.channelsMtx.RUnlock()
+
+		ch.Close()
 	}
 }

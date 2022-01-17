@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -34,17 +35,24 @@ import (
 )
 
 const (
-	txFinalityDepth = 1 // Number of transaction confirmations.
+	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
+	proposerIdx     = 0 // Participant index of the proposer.  //TODO go-perun: expose channel.ProposerIdx and ReceiverIdx.
+	receiverIdx     = 1 // Participant index of the receiver.
 )
 
-type Client struct {
+type Client struct { //TODO add coments to variables?
+	Name            string
 	PerunClient     *client.Client
 	ContractBackend ethchannel.ContractInterface
 	Adjudicator     common.Address
 	AccountAddress  wallet.Address
+	channels        map[channel.ID]*Channel
+	channelsMtx     sync.RWMutex
 }
 
 func StartClient(
+	name string,
+	bus wire.Bus,
 	w *swallet.Wallet,
 	acc common.Address,
 	nodeURL string,
@@ -63,11 +71,6 @@ func StartClient(
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
-	// Setup message bus.
-	waddr := ethwallet.AsWalletAddr(acc)
-	bus := wire.NewLocalBus()
-	// TODO add tutorial that explains tcp/ip bus.
-
 	// Setup funder and adjudicator.
 	funder := ethchannel.NewFunder(cb)
 	ethAcc := accounts.Account{Address: acc}
@@ -80,6 +83,7 @@ func StartClient(
 	}
 
 	// Setup Perun client.
+	waddr := ethwallet.AsWalletAddr(acc)
 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
@@ -87,32 +91,34 @@ func StartClient(
 
 	// Create client and start request handler.
 	c := &Client{
-		perunClient,
-		cb,
-		adjudicator,
-		waddr,
+		Name:            name,
+		PerunClient:     perunClient,
+		ContractBackend: cb,
+		Adjudicator:     adjudicator,
+		AccountAddress:  waddr,
+		channels:        map[channel.ID]*Channel{},
 	}
 	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *Client) OpenChannel(peer *Client, asset common.Address, amount uint64) Channel {
+func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) Channel {
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 	participants := []wire.Address{c.AccountAddress, peer.AccountAddress}
 
 	// We verify the asset holder contract.
-	err := ethchannel.ValidateAssetHolderETH(context.TODO(), c.ContractBackend, asset, c.Adjudicator)
+	ethAsset := common.Address(*asset.(*ethwallet.Address))
+	err := ethchannel.ValidateAssetHolderETH(context.TODO(), c.ContractBackend, ethAsset, c.Adjudicator)
 	if err != nil {
-		panic(err)
+		panic(err) //TODO return error instead of panic?
 	}
 
 	// We create an initial allocation which defines the starting balances.
-	ethAsset := ethwallet.AsWalletAddr(asset)       // Convert to wallet.Address, which implements Asset. //TODO create ethchannel.AsAsset
-	initAlloc := channel.NewAllocation(2, ethAsset) //TODO Create issue: init the balances to zero.
-	initAlloc.SetAssetBalances(ethAsset, []channel.Bal{
+	initAlloc := channel.NewAllocation(2, asset) //TODO Create issue: init the balances to zero.
+	initAlloc.SetAssetBalances(asset, []channel.Bal{
 		new(big.Int).SetUint64(amount), // Our initial balance.
 		big.NewInt(0),                  // Peer's initial balance.
 	})
@@ -135,44 +141,9 @@ func (c *Client) OpenChannel(peer *Client, asset common.Address, amount uint64) 
 		panic(err)
 	}
 
-	return Channel{ch: ch}
+	return *newChannel(ch)
 }
 
-type Channel struct {
-	ch    *client.Channel
-	asset channel.Asset
-}
-
-//TODO document all exported functions.
-func (c Channel) SendPayment(amount uint64) {
-	// Transfer the given amount from us to peer.
-	// Use UpdateBy to update the channel state.
-	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { //TODO we always use context.TODO for simplicity.
-		ethAmount := new(big.Int).SetUint64(amount)
-		state.Allocation.TransferBalance(0, 1, c.asset, ethAmount)
-		return nil
-	})
-	if err != nil {
-		panic(err) //TODO mention that we always panic on error for simplicity.
-	}
-}
-
-func (c Channel) Close() {
-	// Finalize the channel to enable fast settlement.
-	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
-		state.IsFinal = true
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	// Settle concludes the channel and withdraws the funds.
-	err = c.ch.Settle(context.TODO(), false)
-	if err != nil {
-		panic(err)
-	}
-
-	// Close frees up channel resources.
-	c.ch.Close()
+func (c *Client) Shutdown() {
+	c.PerunClient.Close()
 }
