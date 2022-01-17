@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -35,8 +34,7 @@ import (
 )
 
 const (
-	dialerTimeout   = 10 * time.Second
-	txFinalityDepth = 1
+	txFinalityDepth = 1 // Number of transaction confirmations.
 )
 
 type Client struct {

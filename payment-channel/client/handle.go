@@ -22,23 +22,29 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
-	perunio "perun.network/go-perun/pkg/io"
 )
+
+const proposerIdx = 0 //TODO go-perun: expose channel.ProposerIdx
 
 func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
 	// Ensure that we got a ledger channel proposal.
 	lcp, ok := p.(*client.LedgerChannelProposal)
 	if !ok {
 		fmt.Printf("Wrong channel proposal type: %T\n", p)
+		r.Reject(context.TODO(), "Invalid proposal type.")
 		return
 	}
 
-	// Check that our balance is 0.
-	perunio.EqualEncoding(c.asset, p.Base().InitBals.Assets) //TODO check correct assets. (one asset with correct address)
-	initBal := lcp.FundingAgreement[assetIdx][partIdx]
-	if initBal.Cmp(big.NewInt(0)) != 0 {
-		fmt.Printf("Wrong initial balance: %v\n", initBal)
-		return
+	// Check that we do not need to fund anything.
+	zeroBal := big.NewInt(0)
+	for _, bals := range lcp.FundingAgreement {
+		for i, bal := range bals {
+			if i != proposerIdx && bal.Cmp(zeroBal) != 0 {
+				fmt.Printf("Expected funding balance 0, got %v\n", bal)
+				r.Reject(context.TODO(), "Invalid funding agreement.")
+				return
+			}
+		}
 	}
 
 	// Create a channel accept message and send it.
@@ -52,34 +58,56 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 		return
 	}
 
-	c.HandleNewChannel(ch)
+	c.startWatcher(ch)
 }
 
-func (c *Client) HandleUpdate(state *channel.State, update client.ChannelUpdate, responder *client.UpdateResponder) {
-	// We will accept every update that increases our balance.
-	if err := responder.Accept(context.TODO()); err != nil {
-		fmt.Printf("%s: Could not accept update: %v\n", c.RoleAsString(), err)
+func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
+	// We accept every update that increases our balance.
+
+	// Ensure that the assets did not change.
+	err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets)
+	if err != nil {
+		r.Reject(context.TODO(), "Invalid assets.")
+		return
+	}
+
+	// Ensure that our balance has increased.
+	err = next.State.Balances.AssertGreaterOrEqual(cur.Balances)
+	for i, bals := range next.State.Balances {
+		for j, nextBal := range bals {
+			curBal := cur.Balances[i][j]
+			if i != proposerIdx && nextBal.Cmp(curBal) > 0 {
+				r.Reject(context.TODO(), "Invalid balances.")
+				return
+			}
+		}
+	}
+
+	// Send the acceptance message.
+	err = r.Accept(context.TODO())
+	if err != nil {
+		fmt.Printf("Error accepting update: %v\n", err)
+		return
 	}
 }
 
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
-	fmt.Printf("%s: HandleAdjudicatorEvent\n", c.RoleAsString())
-	if _, ok := e.(*channel.ConcludedEvent); ok && c.role == RoleAlice {
+func (c *Client) startWatcher(ch *client.Channel) {
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			// Panic because if the watcher is not running, we are no longer
+			// protected against registration of old states.
+			panic("Watcher returned with error: %v", err)
+		}
+	}()
+}
+
+func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO provide channel with event.
+	c.Log("Received Adjudicator event: %T", e)
+	if _, ok := e.(*channel.ConcludedEvent); ok {
 		err := c.CloseChannel()
 		if err != nil {
 			log.Error(err)
 		}
 	}
-}
-
-func (c *Client) HandleNewChannel(ch *client.Channel) {
-	fmt.Printf("%s: HandleNewChannel with id 0x%x\n", c.RoleAsString(), ch.ID())
-	c.Channel = ch
-	// Start the on-chain watcher.
-	go func() {
-		err := ch.Watch(c)
-		if err != nil {
-			fmt.Printf("%s: Watcher returned with: %s", c.RoleAsString(), err)
-		}
-	}()
 }
