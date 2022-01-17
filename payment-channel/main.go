@@ -15,10 +15,6 @@
 package main
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-
-	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
@@ -36,58 +32,28 @@ const (
 func main() {
 	// Setup environment.
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
-	asset := client.NewAsset(assetHolder) // Convert to wallet.Address, which implements channel.Asset. //TODO create ethchannel.AsAsset
-	l := newBalanceLogger(chainURL)
+	asset := client.NewAsset(assetHolder)
 
 	// Setup clients.
-	bus := wire.NewLocalBus() // Setup bus for off-chain communication.	//TODO add tutorial that explains tcp/ip bus.
+	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO add tutorial that explains tcp/ip bus.
 	alice := startClient("Alice", bus, chainURL, adjudicator, assetHolder, keyAlice)
 	bob := startClient("Bob", bus, chainURL, adjudicator, assetHolder, keyBob)
 
-	l.LogBalances(alice, bob) // Print balances before transactions.
+	// Print balances before transactions.
+	l := newBalanceLogger(chainURL)
+	l.LogBalances(alice, bob)
 
+	// Open channel, transact, close.
 	ch := alice.OpenChannel(bob, asset, 10)
 	ch.SendPayment(asset, 3)
 	ch.SendPayment(asset, 2)
 	ch.SendPayment(asset, 1)
 	ch.Close()
 
-	l.LogBalances(alice, bob) // Print balances after transactions.
+	// Print balances after transactions.
+	l.LogBalances(alice, bob)
 
+	// Shutdown.
 	alice.Shutdown()
 	bob.Shutdown()
-}
-
-// startClient sets up a new client with the given parameters.
-func startClient(
-	name string,
-	bus wire.Bus,
-	nodeURL string,
-	adjudicator, assetHolder common.Address,
-	privateKey string,
-) *client.Client {
-	// Create wallet and account.
-	k, err := crypto.HexToECDSA(privateKey)
-	if err != nil {
-		panic(err)
-	}
-	w := swallet.NewWallet(k)
-	acc := crypto.PubkeyToAddress(k.PublicKey)
-
-	// Create and start client.
-	c, err := client.StartClient(
-		name,
-		bus,
-		w,
-		acc,
-		nodeURL,
-		chainID,
-		adjudicator,
-		assetHolder,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	return c
 }

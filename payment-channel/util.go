@@ -25,6 +25,7 @@ import (
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	"perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
@@ -76,4 +77,38 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	}
 
 	return adj, ah
+}
+
+// startClient sets up a new client with the given parameters.
+func startClient(
+	name string,
+	bus wire.Bus,
+	nodeURL string,
+	adjudicator, assetHolder common.Address,
+	privateKey string,
+) *client.Client {
+	// Create wallet and account.
+	k, err := crypto.HexToECDSA(privateKey)
+	if err != nil {
+		panic(err)
+	}
+	w := swallet.NewWallet(k)
+	acc := crypto.PubkeyToAddress(k.PublicKey)
+
+	// Create and start client.
+	c, err := client.StartClient(
+		name,
+		bus,
+		w,
+		acc,
+		nodeURL,
+		chainID,
+		adjudicator,
+		assetHolder,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return c
 }
