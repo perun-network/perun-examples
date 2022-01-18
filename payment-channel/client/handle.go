@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,25 +24,36 @@ import (
 )
 
 func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
-	// Ensure that we got a ledger channel proposal.
-	lcp, ok := p.(*client.LedgerChannelProposal)
-	if !ok {
-		fmt.Printf("Wrong channel proposal type: %T\n", p)
-		r.Reject(context.TODO(), "Invalid proposal type.") //nolint:errcheck // It's OK if rejection fails.
-		return
-	}
+	lcp, err := func() (*client.LedgerChannelProposal, error) {
+		// Ensure that we got a ledger channel proposal.
+		lcp, ok := p.(*client.LedgerChannelProposal)
+		if !ok {
+			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
+		}
 
-	// Check that we do not need to fund anything.
-	//TODO simplify
-	zeroBal := big.NewInt(0)
-	for _, bals := range lcp.FundingAgreement {
-		for i, bal := range bals {
-			if i != proposerIdx && bal.Cmp(zeroBal) != 0 {
-				fmt.Printf("Expected funding balance 0, got %v\n", bal)
-				r.Reject(context.TODO(), "Invalid funding agreement.") //nolint:errcheck // It's OK if rejection fails.
-				return
+		// Check that we have the correct number of participants.
+		if lcp.NumPeers() != 2 { //TODO:go-perun rename NumPeers to NumParts, Peers to Participants anywhere where all parties are referred to
+			return nil, fmt.Errorf("Invalid number of participants: %d", lcp.NumPeers())
+		}
+
+		// Check that the channel has the expected assets.
+		err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.asset})
+		if err != nil {
+			return nil, fmt.Errorf("Invalid assets: %v\n", err)
+		}
+
+		// Check that we do not need to fund anything.
+		zeroBal := big.NewInt(0)
+		for _, bals := range lcp.FundingAgreement {
+			bal := bals[receiverIdx]
+			if bal.Cmp(zeroBal) != 0 {
+				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
 			}
 		}
+		return lcp, nil
+	}()
+	if err != nil {
+		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
 	}
 
 	// Create a channel accept message and send it.
@@ -74,26 +85,22 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 
 func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
 	// We accept every update that increases our balance.
-
-	// Ensure that the assets did not change.
-	//TODO check if this is not already checked by go-perun?
-	err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets)
-	if err != nil {
-		r.Reject(context.TODO(), "Invalid assets.") //nolint:errcheck // It's OK if rejection fails.
-		return
-	}
-
-	// Ensure that our balance has increased.
-	//TODO comment: go-perun ensures that total balance stays the same.
-	//TODO simplify
-	for i, bals := range next.State.Balances {
-		for j, nextBal := range bals {
-			curBal := cur.Balances[i][j]
-			if i != proposerIdx && nextBal.Cmp(curBal) > 0 {
-				r.Reject(context.TODO(), "Invalid balances.") //nolint:errcheck // It's OK if rejection fails.
-				return
-			}
+	err := func() error {
+		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
+		if err != nil {
+			return fmt.Errorf("Invalid assets: %v", err)
 		}
+
+		//TODO comment: go-perun ensures that total balance stays the same. //TODO:go-perun bug, machine.go:validTransition does only check balances, but not assets.
+		curBal := cur.Allocation.Balance(receiverIdx, c.asset)
+		nextBal := next.State.Allocation.Balance(receiverIdx, c.asset)
+		if nextBal.Cmp(curBal) < 0 {
+			return fmt.Errorf("Invalid balance: %v", nextBal)
+		}
+		return nil
+	}()
+	if err != nil {
+		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
 	}
 
 	// Send the acceptance message.
@@ -104,7 +111,7 @@ func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *
 	}
 }
 
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO provide channel with event. expose channel registry?
+func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
 	c.Logf("Received Adjudicator event: %T", e)
 
 	switch e := e.(type) {

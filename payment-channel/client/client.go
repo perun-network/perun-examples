@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,11 +36,11 @@ import (
 
 const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
-	proposerIdx     = 0 // Participant index of the proposer.  //TODO go-perun: expose channel.ProposerIdx and ReceiverIdx.
+	proposerIdx     = 0 // Participant index of the proposer.  //TODO:go-perun expose channel.ProposerIdx and ReceiverIdx.
 	receiverIdx     = 1 // Participant index of the receiver.
 )
 
-type Client struct { //TODO add coments to variables?
+type Client struct { //TODO:code add coments to variables?
 	Name            string
 	PerunClient     *client.Client
 	ContractBackend ethchannel.ContractInterface
@@ -49,6 +49,7 @@ type Client struct { //TODO add coments to variables?
 	AccountAddress  wallet.Address
 	channels        map[channel.ID]*Channel
 	channelsMtx     sync.RWMutex
+	asset           channel.Asset
 }
 
 func StartClient(
@@ -109,6 +110,7 @@ func StartClient(
 		Adjudicator:     adjudicator,
 		AccountAddress:  waddr,
 		channels:        map[channel.ID]*Channel{},
+		asset:           &asset,
 	}
 	go perunClient.Handle(c, c)
 
@@ -122,7 +124,7 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 	participants := []wire.Address{c.AccountAddress, peer.AccountAddress}
 
 	// We create an initial allocation which defines the starting balances.
-	initAlloc := channel.NewAllocation(2, asset) //TODO Create issue: init the balances to zero.
+	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
 	initAlloc.SetAssetBalances(asset, []channel.Bal{
 		new(big.Int).SetUint64(amount), // Our initial balance.
 		big.NewInt(0),                  // Peer's initial balance.

@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,13 +29,16 @@ const (
 	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
+// main runs a demo of the payment client. It assumes that a blockchain node is
+// available at `chainURL` and that the accounts corresponding to the specified
+// secret keys are provided with sufficient funds.
 func main() {
 	// Setup environment.
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
 	asset := client.NewAsset(assetHolder)
 
 	// Setup clients.
-	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO add tutorial that explains tcp/ip bus.
+	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial add tutorial that explains tcp/ip bus.
 	alice := startClient("Alice", bus, chainURL, adjudicator, assetHolder, keyAlice)
 	bob := startClient("Bob", bus, chainURL, adjudicator, assetHolder, keyBob)
 

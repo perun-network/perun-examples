@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,13 +65,13 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
 
 	// Deploy adjudicator.
-	adj, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc) //TODO accept ethwallet Account instead?
+	adj, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc) //TODO:go-perun accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}
 
 	// Deploy asset holder.
-	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO accept ethwallet Account instead?
+	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO:go-perun accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}

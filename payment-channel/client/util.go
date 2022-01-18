@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ func CreateContractBackend(
 	w *swallet.Wallet,
 ) (ethchannel.ContractBackend, error) {
 	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
-	transactor := swallet.NewTransactor(w, signer) //TODO transactor should be spawnable from Wallet: Add method "NewTransactor"
+	transactor := swallet.NewTransactor(w, signer) //TODO:go-perun transactor should be spawnable from Wallet: Add method "NewTransactor"
 
 	ethClient, err := ethclient.Dial(nodeURL)
 	if err != nil {
@@ -48,6 +48,5 @@ func (c *Client) Logf(format string, v ...interface{}) {
 }
 
 func NewAsset(assetHolder common.Address) *ethchannel.Asset {
-	return ethwallet.AsWalletAddr(assetHolder) // Convert to ethwallet.Address, which implements channel.Asset. //TODO create ethchannel.AsAsset
-
+	return ethwallet.AsWalletAddr(assetHolder) // Convert to ethwallet.Address, which implements channel.Asset. //TODO:go-perun create ethchannel.AsAsset
 }
