@@ -47,6 +47,10 @@ func (c *Client) Logf(format string, v ...interface{}) {
 	log.Printf("%v: %s", c.Name, fmt.Sprintf(format, v...))
 }
 
+func (c *Client) AccountAddress() common.Address {
+	return common.Address(*c.account.(*ethwallet.Address))
+}
+
 func NewAsset(assetHolder common.Address) *ethchannel.Asset {
 	return ethwallet.AsWalletAddr(assetHolder) // Convert to ethwallet.Address, which implements channel.Asset. //TODO:go-perun create ethchannel.AsAsset
 }

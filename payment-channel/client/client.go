@@ -41,15 +41,12 @@ const (
 )
 
 type Client struct { //TODO:code add coments to variables?
-	Name            string
-	PerunClient     *client.Client
-	ContractBackend ethchannel.ContractInterface
-	Funder          *ethchannel.Funder
-	Adjudicator     common.Address
-	AccountAddress  wallet.Address
-	channels        map[channel.ID]*Channel
-	channelsMtx     sync.RWMutex
-	asset           channel.Asset
+	Name        string
+	perunClient *client.Client
+	account     wallet.Address
+	channels    map[channel.ID]*Channel
+	channelsMtx sync.RWMutex
+	currency    channel.Asset // The currency we expect to get paid in.
 }
 
 func StartClient(
@@ -103,14 +100,11 @@ func StartClient(
 
 	// Create client and start request handler.
 	c := &Client{
-		Name:            name,
-		PerunClient:     perunClient,
-		ContractBackend: cb,
-		Funder:          funder,
-		Adjudicator:     adjudicator,
-		AccountAddress:  waddr,
-		channels:        map[channel.ID]*Channel{},
-		asset:           &asset,
+		Name:        name,
+		perunClient: perunClient,
+		account:     waddr,
+		channels:    map[channel.ID]*Channel{},
+		currency:    &asset,
 	}
 	go perunClient.Handle(c, c)
 
@@ -121,7 +115,7 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	participants := []wire.Address{c.AccountAddress, peer.AccountAddress}
+	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
@@ -134,7 +128,7 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
-		c.AccountAddress,
+		c.account,
 		initAlloc,
 		participants,
 	)
@@ -143,7 +137,7 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 	}
 
 	// Send the proposal.
-	ch, err := c.PerunClient.ProposeChannel(context.TODO(), proposal)
+	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		panic(err)
 	}
@@ -152,5 +146,5 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 }
 
 func (c *Client) Shutdown() {
-	c.PerunClient.Close()
+	c.perunClient.Close()
 }

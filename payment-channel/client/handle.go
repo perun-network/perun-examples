@@ -37,7 +37,7 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 		}
 
 		// Check that the channel has the expected assets.
-		err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.asset})
+		err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.currency})
 		if err != nil {
 			return nil, fmt.Errorf("Invalid assets: %v\n", err)
 		}
@@ -58,7 +58,7 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 
 	// Create a channel accept message and send it.
 	accept := lcp.Accept(
-		c.AccountAddress,         // The account we use in the channel.
+		c.account,                // The account we use in the channel.
 		client.WithRandomNonce(), // Our share of the channel nonce.
 	)
 	ch, err := r.Accept(context.TODO(), accept)
@@ -92,8 +92,8 @@ func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *
 		}
 
 		//TODO comment: go-perun ensures that total balance stays the same. //TODO:go-perun bug, machine.go:validTransition does only check balances, but not assets.
-		curBal := cur.Allocation.Balance(receiverIdx, c.asset)
-		nextBal := next.State.Allocation.Balance(receiverIdx, c.asset)
+		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
+		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
 		if nextBal.Cmp(curBal) < 0 {
 			return fmt.Errorf("Invalid balance: %v", nextBal)
 		}

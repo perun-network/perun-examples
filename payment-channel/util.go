@@ -23,35 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
-	"perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
-type balanceLogger struct {
-	ethClient *ethclient.Client
-}
-
-func newBalanceLogger(chainURL string) balanceLogger {
-	c, err := ethclient.Dial(chainURL)
-	if err != nil {
-		panic(err)
-	}
-	return balanceLogger{ethClient: c}
-}
-
-func (l balanceLogger) LogBalances(clients ...*client.Client) {
-	for _, c := range clients {
-		addr := common.Address(*c.AccountAddress.(*wallet.Address))
-		bal, err := l.ethClient.BalanceAt(context.TODO(), addr, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("Balance of %v: %v", c.Name, bal)
-	}
-}
-
+// deployContracts deploys the Perun smart contracts on the specified ledger.
 func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah common.Address) {
 	k, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
@@ -111,4 +88,27 @@ func startClient(
 	}
 
 	return c
+}
+
+// balanceLogger is a utility for logging client balances.
+type balanceLogger struct {
+	ethClient *ethclient.Client
+}
+
+func newBalanceLogger(chainURL string) balanceLogger {
+	c, err := ethclient.Dial(chainURL)
+	if err != nil {
+		panic(err)
+	}
+	return balanceLogger{ethClient: c}
+}
+
+func (l balanceLogger) LogBalances(clients ...*client.Client) {
+	for _, c := range clients {
+		bal, err := l.ethClient.BalanceAt(context.TODO(), c.AccountAddress(), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Balance of %v: %v", c.Name, bal)
+	}
 }
