@@ -15,8 +15,6 @@
 package client
 
 import (
-	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,6 +25,7 @@ import (
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 )
 
+// CreateContractBackend creates a new contract backend.
 func CreateContractBackend(
 	nodeURL string,
 	chainID uint64,
@@ -43,14 +42,12 @@ func CreateContractBackend(
 	return ethchannel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-func (c *Client) Logf(format string, v ...interface{}) {
-	log.Printf("%v: %s", c.Name, fmt.Sprintf(format, v...))
-}
-
-func (c *Client) AccountAddress() common.Address {
+// AccountAddress returns the account address of the client.
+func (c *PaymentClient) AccountAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
 }
 
+// NewAsset creates an Ethereum channel asset from an Ethereum address.
 func NewAsset(assetHolder common.Address) *ethchannel.Asset {
 	return ethwallet.AsWalletAddr(assetHolder) // Convert to ethwallet.Address, which implements channel.Asset. //TODO:go-perun create ethchannel.AsAsset
 }

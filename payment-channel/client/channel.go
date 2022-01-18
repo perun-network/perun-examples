@@ -8,29 +8,32 @@ import (
 	"perun.network/go-perun/client"
 )
 
-type Channel struct {
+// PaymentChannel is a wrapper for a Perun channel for the payment use case.
+type PaymentChannel struct {
 	ch *client.Channel
 }
 
-func newChannel(ch *client.Channel) *Channel {
-	return &Channel{ch: ch}
+// newPaymentChannel creates a new payment channel.
+func newPaymentChannel(ch *client.Channel) *PaymentChannel {
+	return &PaymentChannel{ch: ch}
 }
 
-//TODO:code document all exported functions.
-func (c Channel) SendPayment(asset channel.Asset, amount uint64) {
+// SendPayment sends a payment to the channel peer.
+func (c PaymentChannel) SendPayment(asset channel.Asset, amount uint64) {
 	// Transfer the given amount from us to peer.
 	// Use UpdateBy to update the channel state.
-	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { //TODO:code mention that we always use context.TODO for simplicity.
+	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { // We use context.TODO to keep the code simple.
 		ethAmount := new(big.Int).SetUint64(amount)
 		state.Allocation.TransferBalance(proposerIdx, receiverIdx, asset, ethAmount)
 		return nil
 	})
 	if err != nil {
-		panic(err) //TODO:code mention that we always panic on error for simplicity.
+		panic(err) // We panic on error to keep the code simple.
 	}
 }
 
-func (c Channel) Close() {
+// Settle settles the payment channel and withdraws the funds.
+func (c PaymentChannel) Settle() {
 	// Finalize the channel to enable fast settlement.
 	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
 		state.IsFinal = true

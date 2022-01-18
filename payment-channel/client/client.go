@@ -40,17 +40,17 @@ const (
 	receiverIdx     = 1 // Participant index of the receiver.
 )
 
-type Client struct { //TODO:code add coments to variables?
-	Name        string
-	perunClient *client.Client
-	account     wallet.Address
-	channels    map[channel.ID]*Channel
-	channelsMtx sync.RWMutex
-	currency    channel.Asset // The currency we expect to get paid in.
+// PaymentClient is a payment channel client.
+type PaymentClient struct {
+	perunClient *client.Client                 // The core Perun client.
+	account     wallet.Address                 // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset                  // The currency we expect to get paid in.
+	channels    map[channel.ID]*PaymentChannel // A registry to store the channels.
+	channelsMtx sync.RWMutex                   // A mutex to protect the channel registry from concurrent access.
 }
 
-func StartClient(
-	name string,
+// SetupPaymentClient creates a new payment client.
+func SetupPaymentClient(
 	bus wire.Bus,
 	w *swallet.Wallet,
 	acc common.Address,
@@ -58,7 +58,7 @@ func StartClient(
 	chainID uint64,
 	adjudicator common.Address,
 	assetHolder common.Address,
-) (*Client, error) {
+) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
@@ -99,19 +99,19 @@ func StartClient(
 	}
 
 	// Create client and start request handler.
-	c := &Client{
-		Name:        name,
+	c := &PaymentClient{
 		perunClient: perunClient,
 		account:     waddr,
-		channels:    map[channel.ID]*Channel{},
 		currency:    &asset,
+		channels:    map[channel.ID]*PaymentChannel{},
 	}
 	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) Channel {
+// OpenChannel opens a new channel with the specified peer and funding.
+func (c *PaymentClient) OpenChannel(peer *PaymentClient, asset channel.Asset, amount uint64) PaymentChannel {
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
@@ -142,9 +142,10 @@ func (c *Client) OpenChannel(peer *Client, asset channel.Asset, amount uint64) C
 		panic(err)
 	}
 
-	return *newChannel(ch)
+	return *newPaymentChannel(ch)
 }
 
-func (c *Client) Shutdown() {
+// Shutdown gracefully shuts down the client.
+func (c *PaymentClient) Shutdown() {
 	c.perunClient.Close()
 }

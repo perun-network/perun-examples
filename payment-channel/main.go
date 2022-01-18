@@ -15,6 +15,8 @@
 package main
 
 import (
+	"log"
+
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
@@ -29,34 +31,44 @@ const (
 	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
+//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code in simple, but in production code one should always use proper context and handle error appropriately.
+
 // main runs a demo of the payment client. It assumes that a blockchain node is
 // available at `chainURL` and that the accounts corresponding to the specified
 // secret keys are provided with sufficient funds.
 func main() {
-	// Setup environment.
+	// Deploy contracts.
+	log.Println("Deploying contracts.")
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
 	asset := client.NewAsset(assetHolder)
 
 	// Setup clients.
-	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial add tutorial that explains tcp/ip bus.
-	alice := startClient("Alice", bus, chainURL, adjudicator, assetHolder, keyAlice)
-	bob := startClient("Bob", bus, chainURL, adjudicator, assetHolder, keyBob)
+	log.Println("Setting up clients.")
+	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial Extension that explains tcp/ip bus.
+	alice := setupPaymentClient(bus, chainURL, adjudicator, assetHolder, keyAlice)
+	bob := setupPaymentClient(bus, chainURL, adjudicator, assetHolder, keyBob)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
 	l.LogBalances(alice, bob)
 
 	// Open channel, transact, close.
+	log.Println("Opening channel.")
 	ch := alice.OpenChannel(bob, asset, 10)
+
+	log.Println("Sending payments.")
 	ch.SendPayment(asset, 3)
 	ch.SendPayment(asset, 2)
 	ch.SendPayment(asset, 1)
-	ch.Close()
+
+	log.Println("Settling channel.")
+	ch.Settle()
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)
 
 	// Shutdown.
+	log.Println("Shutting down.")
 	alice.Shutdown()
 	bob.Shutdown()
 }

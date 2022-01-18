@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"log"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -56,14 +57,13 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	return adj, ah
 }
 
-// startClient sets up a new client with the given parameters.
-func startClient(
-	name string,
+// setupPaymentClient sets up a new client with the given parameters.
+func setupPaymentClient(
 	bus wire.Bus,
 	nodeURL string,
 	adjudicator, assetHolder common.Address,
 	privateKey string,
-) *client.Client {
+) *client.PaymentClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
@@ -73,8 +73,7 @@ func startClient(
 	acc := crypto.PubkeyToAddress(k.PublicKey)
 
 	// Create and start client.
-	c, err := client.StartClient(
-		name,
+	c, err := client.SetupPaymentClient(
 		bus,
 		w,
 		acc,
@@ -95,6 +94,7 @@ type balanceLogger struct {
 	ethClient *ethclient.Client
 }
 
+// newBalanceLogger creates a new balance logger for the specified ledger.
 func newBalanceLogger(chainURL string) balanceLogger {
 	c, err := ethclient.Dial(chainURL)
 	if err != nil {
@@ -103,12 +103,15 @@ func newBalanceLogger(chainURL string) balanceLogger {
 	return balanceLogger{ethClient: c}
 }
 
-func (l balanceLogger) LogBalances(clients ...*client.Client) {
-	for _, c := range clients {
+// LogBalances prints the balances of the specified clients.
+func (l balanceLogger) LogBalances(clients ...*client.PaymentClient) {
+	bals := make([]*big.Int, len(clients))
+	for i, c := range clients {
 		bal, err := l.ethClient.BalanceAt(context.TODO(), c.AccountAddress(), nil)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("Balance of %v: %v", c.Name, bal)
+		bals[i] = bal
 	}
+	log.Println("Client balances:", bals)
 }

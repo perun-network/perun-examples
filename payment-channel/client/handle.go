@@ -23,7 +23,8 @@ import (
 	"perun.network/go-perun/client"
 )
 
-func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
+// HandleProposal is the callback for incoming channel proposals.
+func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
 	lcp, err := func() (*client.LedgerChannelProposal, error) {
 		// Ensure that we got a ledger channel proposal.
 		lcp, ok := p.(*client.LedgerChannelProposal)
@@ -69,7 +70,7 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 
 	// Store channel.
 	c.channelsMtx.Lock()
-	c.channels[ch.ID()] = newChannel(ch)
+	c.channels[ch.ID()] = newPaymentChannel(ch)
 	c.channelsMtx.Unlock()
 
 	// Start the on-chain event watcher. It automatically handles disputes.
@@ -83,7 +84,8 @@ func (c *Client) HandleProposal(p client.ChannelProposal, r *client.ProposalResp
 	}()
 }
 
-func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
+// HandleUpdate is the callback for incoming channel updates.
+func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
 	// We accept every update that increases our balance.
 	err := func() error {
 		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
@@ -91,7 +93,7 @@ func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *
 			return fmt.Errorf("Invalid assets: %v", err)
 		}
 
-		//TODO comment: go-perun ensures that total balance stays the same. //TODO:go-perun bug, machine.go:validTransition does only check balances, but not assets.
+		//TODO:go-perun bug, machine.go: `validTransition` checks whether balances per asset index are preserved, but does not check whether assets are the same.
 		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
 		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
 		if nextBal.Cmp(curBal) < 0 {
@@ -106,14 +108,12 @@ func (c *Client) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *
 	// Send the acceptance message.
 	err = r.Accept(context.TODO())
 	if err != nil {
-		c.Logf("Error accepting update: %v\n", err)
-		return
+		panic(err)
 	}
 }
 
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
-	c.Logf("Received Adjudicator event: %T", e)
-
+// HandleAdjudicatorEvent is the callback for smart contract events.
+func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
 	switch e := e.(type) {
 	case *channel.ConcludedEvent:
 		c.channelsMtx.RLock()
