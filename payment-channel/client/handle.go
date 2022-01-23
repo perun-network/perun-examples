@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,66 +15,114 @@
 package client
 
 import (
+	"context"
 	"fmt"
+	"math/big"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
-	"perun.network/go-perun/log"
 )
 
-func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *client.ProposalResponder) {
-	// Check that we got a ledger channel proposal.
-	_proposal, ok := proposal.(*client.LedgerChannelProposal)
-	if !ok {
-		fmt.Printf("%s: Received a proposal that was not for a ledger channel.", c.RoleAsString())
-		return
-	}
-	fmt.Printf("%s: Received channel proposal\n", c.RoleAsString())
+// HandleProposal is the callback for incoming channel proposals.
+func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
+	lcp, err := func() (*client.LedgerChannelProposal, error) {
+		// Ensure that we got a ledger channel proposal.
+		lcp, ok := p.(*client.LedgerChannelProposal)
+		if !ok {
+			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
+		}
 
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
+		// Check that we have the correct number of participants.
+		if lcp.NumPeers() != 2 { //TODO:go-perun rename NumPeers to NumParts, Peers to Participants anywhere where all parties are referred to
+			return nil, fmt.Errorf("Invalid number of participants: %d", lcp.NumPeers())
+		}
+
+		// Check that the channel has the expected assets.
+		err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.currency})
+		if err != nil {
+			return nil, fmt.Errorf("Invalid assets: %v\n", err)
+		}
+
+		// Check that we do not need to fund anything.
+		zeroBal := big.NewInt(0)
+		for _, bals := range lcp.FundingAgreement {
+			bal := bals[receiverIdx]
+			if bal.Cmp(zeroBal) != 0 {
+				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
+			}
+		}
+		return lcp, nil
+	}()
+	if err != nil {
+		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
+	}
 
 	// Create a channel accept message and send it.
-	accept := _proposal.Accept(c.PerunAddress(), client.WithRandomNonce())
-	ch, err := responder.Accept(ctx, accept)
-
+	accept := lcp.Accept(
+		c.account,                // The account we use in the channel.
+		client.WithRandomNonce(), // Our share of the channel nonce.
+	)
+	ch, err := r.Accept(context.TODO(), accept)
 	if err != nil {
-		fmt.Printf("%s: Accepting channel: %w\n", c.RoleAsString(), err)
-	} else {
-		fmt.Printf("%s: Accepted channel with id 0x%x\n", c.RoleAsString(), ch.ID())
+		fmt.Printf("Error accepting channel proposal: %v\n", err)
+		return
 	}
 
-	c.HandleNewChannel(ch) // TODO: 1/2 Check with MG why this is needed here (and not needed in App Channel example)
-}
+	// Store channel.
+	c.channelsMtx.Lock()
+	c.channels[ch.ID()] = newPaymentChannel(ch)
+	c.channelsMtx.Unlock()
 
-func (c *Client) HandleUpdate(state *channel.State, update client.ChannelUpdate, responder *client.UpdateResponder) {
-	fmt.Printf("%s: HandleUpdate\n", c.RoleAsString())
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	// We will accept every update
-	if err := responder.Accept(ctx); err != nil {
-		fmt.Printf("%s: Could not accept update: %v\n", c.RoleAsString(), err)
-	}
-}
-
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
-	fmt.Printf("%s: HandleAdjudicatorEvent\n", c.RoleAsString())
-	if _, ok := e.(*channel.ConcludedEvent); ok && c.role == RoleAlice {
-		err := c.CloseChannel()
-		if err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (c *Client) HandleNewChannel(ch *client.Channel) {
-	fmt.Printf("%s: HandleNewChannel with id 0x%x\n", c.RoleAsString(), ch.ID())
-	c.Channel = ch
-	// Start the on-chain watcher.
+	// Start the on-chain event watcher. It automatically handles disputes.
 	go func() {
 		err := ch.Watch(c)
 		if err != nil {
-			fmt.Printf("%s: Watcher returned with: %s", c.RoleAsString(), err)
+			// Panic because if the watcher is not running, we are no longer
+			// protected against registration of old states.
+			panic(fmt.Sprintf("Watcher returned with error: %v", err))
 		}
 	}()
+}
+
+// HandleUpdate is the callback for incoming channel updates.
+func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
+	// We accept every update that increases our balance.
+	err := func() error {
+		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
+		if err != nil {
+			return fmt.Errorf("Invalid assets: %v", err)
+		}
+
+		//TODO:go-perun bug, machine.go: `validTransition` checks whether balances per asset index are preserved, but does not check whether assets are the same.
+		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
+		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
+		if nextBal.Cmp(curBal) < 0 {
+			return fmt.Errorf("Invalid balance: %v", nextBal)
+		}
+		return nil
+	}()
+	if err != nil {
+		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
+	}
+
+	// Send the acceptance message.
+	err = r.Accept(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+}
+
+// HandleAdjudicatorEvent is the callback for smart contract events.
+func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
+	switch e := e.(type) {
+	case *channel.ConcludedEvent:
+		c.channelsMtx.RLock()
+		ch := c.channels[e.ID()]
+		c.channelsMtx.RUnlock()
+
+		err := ch.ch.Settle(context.TODO(), false)
+		if err != nil {
+			panic(err)
+		}
+	}
 }

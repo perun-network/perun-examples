@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,47 +15,39 @@
 package client
 
 import (
-	"context"
-	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
-	"perun.network/go-perun/wallet"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 )
 
-func (c *Client) PerunAddress() wallet.Address {
-	return c.PerunClient.Account.Address()
-}
+// CreateContractBackend creates a new contract backend.
+func CreateContractBackend(
+	nodeURL string,
+	chainID uint64,
+	w *swallet.Wallet,
+) (ethchannel.ContractBackend, error) {
+	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
+	transactor := swallet.NewTransactor(w, signer) //TODO:go-perun transactor should be spawnable from Wallet: Add method "NewTransactor"
 
-func (c *Client) Address() common.Address {
-	return c.PerunClient.Account.Account.Address
-}
-
-func (c *Client) defaultContextWithTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), c.ContextTimeout)
-}
-
-func (c *Client) Logf(format string, v ...interface{}) {
-	fmt.Printf("Client %v: %v", c.Address(), fmt.Sprintf(format, v...))
-}
-
-func (c *Client) OnChainBalance() (b *big.Int, err error) {
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-	return c.PerunClient.EthClient.BalanceAt(ctx, c.Address(), nil)
-}
-
-func (c *Client) RoleAsString() (name string) {
-	if c.role == RoleAlice {
-		return "Alice"
-	} else {
-		return "Bob"
+	ethClient, err := ethclient.Dial(nodeURL)
+	if err != nil {
+		return ethchannel.ContractBackend{}, err
 	}
+
+	return ethchannel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-func (c *Client) PeerRoleAsString() (name string) {
-	if 1-c.role == RoleAlice {
-		return "Alice"
-	} else {
-		return "Bob"
-	}
+// AccountAddress returns the account address of the client.
+func (c *PaymentClient) AccountAddress() common.Address {
+	return common.Address(*c.account.(*ethwallet.Address))
+}
+
+// NewAsset creates an Ethereum channel asset from an Ethereum address.
+func NewAsset(assetHolder common.Address) *ethchannel.Asset {
+	return ethwallet.AsWalletAddr(assetHolder) // Convert to ethwallet.Address, which implements channel.Asset. //TODO:go-perun create ethchannel.AsAsset
 }

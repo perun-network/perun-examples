@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,126 +15,137 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"math/big"
+	"sync"
+
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"perun.network/go-perun/backend/ethereum/bindings/assetholdereth"
-	"perun.network/perun-examples/payment-channel/eth"
 )
 
-type ClientConfig struct {
-	PerunClientConfig
-	ContextTimeout time.Duration
+const (
+	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
+	proposerIdx     = 0 // Participant index of the proposer.  //TODO:go-perun expose channel.ProposerIdx and ReceiverIdx.
+	receiverIdx     = 1 // Participant index of the receiver.
+)
+
+// PaymentClient is a payment channel client.
+type PaymentClient struct {
+	perunClient *client.Client                 // The core Perun client.
+	account     wallet.Address                 // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset                  // The currency we expect to get paid in.
+	channels    map[channel.ID]*PaymentChannel // A registry to store the channels.
+	channelsMtx sync.RWMutex                   // A mutex to protect the channel registry from concurrent access.
 }
 
-type Client struct {
-	role            Role
-	PerunClient     *PerunClient
-	AssetHolderAddr common.Address
-	AssetHolder     *assetholdereth.AssetHolderETH
-	ContextTimeout  time.Duration
-	Channel         *client.Channel
-}
-
-func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := setupPerunClient(cfg.PerunClientConfig)
+// SetupPaymentClient creates a new payment client.
+func SetupPaymentClient(
+	bus wire.Bus,
+	w *swallet.Wallet,
+	acc common.Address,
+	nodeURL string,
+	chainID uint64,
+	adjudicator common.Address,
+	assetHolder common.Address,
+) (*PaymentClient, error) {
+	// Create Ethereum client and contract backend.
+	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating perun client")
+		return nil, fmt.Errorf("creating contract backend: %w", err)
 	}
 
-	ah, err := assetholdereth.NewAssetHolderETH(cfg.AssetHolderAddr, perunClient.ContractBackend)
+	// Validate contracts.
+	err = ethchannel.ValidateAdjudicator(context.TODO(), cb, adjudicator)
 	if err != nil {
-		return nil, errors.WithMessage(err, "loading asset holder")
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
+	}
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, assetHolder, adjudicator)
+	if err != nil {
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
-	c := &Client{
-		cfg.Role,
-		perunClient,
-		cfg.AssetHolderAddr,
-		ah,
-		cfg.ContextTimeout,
-		nil,
+	// Setup funder.
+	funder := ethchannel.NewFunder(cb)
+	asset := *NewAsset(assetHolder)
+	dep := ethchannel.NewETHDepositor()
+	ethAcc := accounts.Account{Address: acc}
+	funder.RegisterAsset(asset, dep, ethAcc)
+
+	// Setup adjudicator.
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+
+	// Setup dispute watcher.
+	watcher, err := local.NewWatcher(adj)
+	if err != nil {
+		return nil, fmt.Errorf("intializing watcher: %w", err)
 	}
 
-	go c.PerunClient.StateChClient.Handle(c, c)
-	go c.PerunClient.Bus.Listen(c.PerunClient.Listener)
+	// Setup Perun client.
+	waddr := ethwallet.AsWalletAddr(acc)
+	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	if err != nil {
+		return nil, errors.WithMessage(err, "creating client")
+	}
+
+	// Create client and start request handler.
+	c := &PaymentClient{
+		perunClient: perunClient,
+		account:     waddr,
+		currency:    &asset,
+		channels:    map[channel.ID]*PaymentChannel{},
+	}
+	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *Client) OpenChannel(peer wallet.Address) error {
-	fmt.Printf("%s: Opening channel from %s to %s\n", c.RoleAsString(), c.RoleAsString(), c.PeerRoleAsString())
-	// Alice and Bob will both start with 10 ETH.
-	initBal := eth.EthToWei(big.NewFloat(10))
-	// Perun needs an initial allocation which defines the balances of all
-	// participants. The same structure is used for multi-asset channels.
-	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{ethwallet.AsWalletAddr(c.AssetHolderAddr)},
-		Balances: [][]*big.Int{{initBal, initBal}},
-	}
-	// All perun identities that we want to open a channel with. In this case
-	// we use the same on- and off-chain accounts but you could use different.
-	peers := []wire.Address{c.PerunClient.Account.Address(), peer}
+// OpenChannel opens a new channel with the specified peer and funding.
+func (c *PaymentClient) OpenChannel(peer *PaymentClient, asset channel.Asset, amount uint64) PaymentChannel {
+	// We define the channel participants. The proposer always has index 0. Here
+	// we use the on-chain addresses as off-chain addresses, but we could also
+	// use different ones.
+	participants := []wire.Address{c.account, peer.account}
 
-	// Prepare the proposal by defining the channel parameters.
-	proposal, err := client.NewLedgerChannelProposal(10, c.PerunAddress(), initBals, peers)
+	// We create an initial allocation which defines the starting balances.
+	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
+	initAlloc.SetAssetBalances(asset, []channel.Bal{
+		new(big.Int).SetUint64(amount), // Our initial balance.
+		big.NewInt(0),                  // Peer's initial balance.
+	})
+
+	// Prepare the channel proposal by defining the channel parameters.
+	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
+	proposal, err := client.NewLedgerChannelProposal(
+		challengeDuration,
+		c.account,
+		initAlloc,
+		participants,
+	)
 	if err != nil {
-		return fmt.Errorf("creating channel proposal: %w", err)
+		panic(err)
 	}
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
 
 	// Send the proposal.
-	ch, err := c.PerunClient.StateChClient.ProposeChannel(ctx, proposal)
-	c.Channel = ch
-
+	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
-		return fmt.Errorf("proposing channel: %w", err)
+		panic(err)
 	}
 
-	fmt.Printf("\n 🎉 Opened channel with id 0x%x \n\n", ch.ID())
-	return nil
+	return *newPaymentChannel(ch)
 }
 
-func (c *Client) UpdateChannel() error {
-	fmt.Printf("%s: Update channel by sending 5 ETH to %s \n", c.RoleAsString(), c.PeerRoleAsString())
-
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-	// Use UpdateBy to conveniently update the channels state.
-	return c.Channel.UpdateBy(ctx, func(state *channel.State) error {
-		// Shift 5 ETH from caller to peer.
-		amount := eth.EthToWei(big.NewFloat(5))
-		state.Balances[0][1-c.role].Sub(state.Balances[0][1-c.role], amount)
-		state.Balances[0][c.role].Add(state.Balances[0][c.role], amount)
-		// Finalize the channel, this will be important in the next step.
-		state.IsFinal = true
-		return nil
-	})
-}
-
-func (c *Client) CloseChannel() error {
-	fmt.Printf("%s: Close Channel \n", c.RoleAsString())
-
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	// .Settle() "closes" the channel (= concludes the channel and withdraws the funds)
-	if err := c.Channel.Settle(ctx, false); err != nil {
-		return fmt.Errorf("settling channel: %w", err)
-	}
-
-	// .Close() terminates the local channel object (frees resources) and has nothing to do with the go-perun channel protocol.
-	if err := c.Channel.Close(); err != nil {
-		return fmt.Errorf("closing channel object: %w", err)
-	}
-	return nil
+// Shutdown gracefully shuts down the client.
+func (c *PaymentClient) Shutdown() {
+	c.perunClient.Close()
 }

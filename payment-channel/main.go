@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,139 +15,60 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
-	"math/big"
-	"time"
+	"log"
 
-	"perun.network/go-perun/backend/ethereum/wallet"
+	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
-type config struct {
-	chainURL              string                            // Url of the Ethereum node.
-	chainID               *big.Int                          // ID of the targeted chain
-	hosts                 map[client.Role]string            // Hosts for incoming connections.
-	privateKeys           map[client.Role]*ecdsa.PrivateKey // Private keys.
-	addrs                 map[client.Role]*wallet.Address   // Wallet addresses.
-	defaultContextTimeout time.Duration                     // Default time for timeout
-}
+const (
+	chainURL = "ws://127.0.0.1:8545"
+	chainID  = 1337
 
-var cfg config
+	// Private keys.
+	keyDeployer = "79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+	keyAlice    = "1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+)
 
-// main performs the opening, updating and closing of a simple perun payment channel
+//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code in simple, but in production code one should always use proper context and handle error appropriately.
+
+// main runs a demo of the payment client. It assumes that a blockchain node is
+// available at `chainURL` and that the accounts corresponding to the specified
+// secret keys are provided with sufficient funds.
 func main() {
-	alice, bob := setup()
-	logAccountBalance(alice, bob)
+	// Deploy contracts.
+	log.Println("Deploying contracts.")
+	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
+	asset := client.NewAsset(assetHolder)
 
-	if err := bob.OpenChannel(cfg.addrs[client.RoleAlice]); err != nil {
-		panic(fmt.Errorf("opening channel: %w", err))
-	}
-	if err := bob.UpdateChannel(); err != nil {
-		panic(fmt.Errorf("updating channel: %w", err))
-	}
-	if err := bob.CloseChannel(); err != nil {
-		panic(fmt.Errorf("closing channel: %w", err))
-	}
+	// Setup clients.
+	log.Println("Setting up clients.")
+	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial Extension that explains tcp/ip bus.
+	alice := setupPaymentClient(bus, chainURL, adjudicator, assetHolder, keyAlice)
+	bob := setupPaymentClient(bus, chainURL, adjudicator, assetHolder, keyBob)
 
-	logAccountBalance(alice, bob)
-}
+	// Print balances before transactions.
+	l := newBalanceLogger(chainURL)
+	l.LogBalances(alice, bob)
 
-// setup creates the two clients Alice and Bob
-func setup() (*client.Client, *client.Client) {
-	initConfig()
+	// Open channel, transact, close.
+	log.Println("Opening channel.")
+	ch := alice.OpenChannel(bob, asset, 10)
 
-	// Deploy contracts (Bob deploys)
-	fmt.Println("Deploying contracts...")
-	nodeURL := cfg.chainURL
-	contracts, err := deployContracts(nodeURL, cfg.chainID, cfg.privateKeys[client.RoleBob], cfg.defaultContextTimeout)
-	if err != nil {
-		panic(fmt.Errorf("deploying contracts: %v", err))
-	}
+	log.Println("Sending payments.")
+	ch.SendPayment(asset, 3)
+	ch.SendPayment(asset, 2)
+	ch.SendPayment(asset, 1)
 
-	fmt.Println("Setting up clients...")
-	// Setup Alice
-	clientConfig1 := createClientConfig(
-		client.RoleAlice, nodeURL, contracts,
-		cfg.privateKeys[client.RoleAlice], cfg.hosts[client.RoleAlice],
-		cfg.addrs[client.RoleBob], cfg.hosts[client.RoleBob],
-	)
+	log.Println("Settling channel.")
+	ch.Settle()
 
-	c1, err := client.StartClient(clientConfig1)
-	if err != nil {
-		panic(fmt.Errorf("alice setup: %v", err))
-	}
+	// Print balances after transactions.
+	l.LogBalances(alice, bob)
 
-	// Setup Bob
-	clientConfig2 := createClientConfig(
-		client.RoleBob, nodeURL, contracts,
-		cfg.privateKeys[client.RoleBob], cfg.hosts[client.RoleBob],
-		cfg.addrs[client.RoleAlice], cfg.hosts[client.RoleAlice],
-	)
-
-	c2, err := client.StartClient(clientConfig2)
-
-	if err != nil {
-		panic(fmt.Errorf("bob setup: %v", err))
-	}
-	fmt.Println("Setup done.")
-
-	return c1, c2
-}
-
-// initConfig initializes the config for a test run via ganache-cli
-func initConfig() {
-	cfg.chainURL = "ws://127.0.0.1:8545"
-	cfg.chainID = big.NewInt(1337)
-	cfg.hosts = map[client.Role]string{
-		client.RoleAlice: "0.0.0.0:8400",
-		client.RoleBob:   "0.0.0.0:8401",
-	}
-
-	cfg.defaultContextTimeout = 15 * time.Second
-
-	// convert the private key strings ...
-	rawKeys := []string{
-		"1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f", // Alice
-		"f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e", // Bob
-	}
-
-	// ... to ECDSA keys:
-	privateKeys := make(map[client.Role]*ecdsa.PrivateKey, len(rawKeys))
-	for index, key := range rawKeys {
-		privateKey, _ := crypto.HexToECDSA(key)
-		privateKeys[client.Role(index)] = privateKey
-	}
-	cfg.privateKeys = privateKeys
-
-	// Fix the on-chain addresses of Alice and Bob.
-	addresses := make(map[client.Role]*wallet.Address, len(rawKeys))
-	for index, key := range cfg.privateKeys {
-		commonAddress := crypto.PubkeyToAddress(key.PublicKey)
-		addresses[index] = wallet.AsWalletAddr(commonAddress)
-	}
-	cfg.addrs = addresses
-}
-
-// createClientConfig is a helper function for client setup.
-func createClientConfig(role client.Role, nodeURL string, contracts ContractAddresses, privateKey *ecdsa.PrivateKey, host string, peerAddress *wallet.Address, peerHost string) client.ClientConfig {
-	return client.ClientConfig{
-		PerunClientConfig: client.PerunClientConfig{
-			Role:            role,
-			PrivateKey:      privateKey,
-			Host:            host,
-			ETHNodeURL:      nodeURL,
-			AdjudicatorAddr: contracts.AdjudicatorAddr,
-			AssetHolderAddr: contracts.AssetHolderAddr,
-			DialerTimeout:   1 * time.Second,
-			PeerAddresses: []client.PeerWithAddress{
-				{
-					Peer:    peerAddress,
-					Address: peerHost,
-				},
-			},
-		},
-		ContextTimeout: cfg.defaultContextTimeout,
-	}
+	// Shutdown.
+	log.Println("Shutting down.")
+	alice.Shutdown()
+	bob.Shutdown()
 }
