@@ -1,80 +1,50 @@
 package client
 
 import (
-	"fmt"
-	"sync"
-
-	"github.com/pkg/errors"
+	"context"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/perun-examples/app-channel/app"
 )
 
-type (
-	Game struct {
-		sync.Mutex
-		c     *Client
-		ch    *client.Channel
-		state *channel.State
-		errs  chan error
-	}
+type Game struct {
+	ch *client.Channel
+}
 
-	GameProposal struct {
-		ch       client.ChannelProposal
-		response chan bool
-		result   chan *ProposalResult
-	}
-
-	ProposalResult struct {
-		g   *Game
-		err error
-	}
-)
-
-func (p *GameProposal) Accept() (*Game, error) {
-	p.response <- true
-	r := <-p.result
-	return r.g, r.err
+func newGame(ch *client.Channel) *Game {
+	return &Game{ch: ch}
 }
 
 func (g *Game) String() string {
-	return g.state.Data.(*app.TicTacToeAppData).String()
+	return g.ch.State().Clone().Data.(*app.TicTacToeAppData).String()
 }
 
-func (g *Game) Set(x, y int) error {
-	g.Lock()
-	defer g.Unlock()
+func (g *Game) Set(x, y int) {
 
-	ctx, cancel := g.c.defaultContextWithTimeout()
-	defer cancel()
-
-	err := g.ch.UpdateBy(ctx, func(s *channel.State) error {
-		_app, ok := s.App.(*app.TicTacToeApp)
-		if !ok {
-			return fmt.Errorf("invalid app type: %T", _app)
-		}
-
+	err := g.ch.UpdateBy(context.TODO(), func(s *channel.State) error {
+		_app := s.App.(*app.TicTacToeApp)
 		return _app.Set(s, x, y, g.ch.Idx())
 	})
+
 	if err != nil {
-		return err
+		panic(err) // We panic on error to keep the code simple.
 	}
-	g.state = g.ch.State().Clone()
-	return nil
 }
 
-func (g *Game) Conclude() error {
-	g.Lock()
-	defer g.Unlock()
-
-	ctx, cancel := g.c.defaultContextWithTimeout()
-	defer cancel()
-
-	err := g.ch.Register(ctx)
+func (g *Game) Settle() {
+	// Finalize the channel to enable fast settlement.
+	err := g.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
+		state.IsFinal = true // TODO:question - Can we finalize app channels like this?
+		return nil
+	})
 	if err != nil {
-		return errors.WithMessage(err, "registering")
+		panic(err)
 	}
 
-	err = g.ch.Settle(ctx, false)
-	return errors.WithMessage(err, "settling channel")
+	err = g.ch.Settle(context.TODO(), false)
+	if err != nil {
+		panic(err)
+	}
+
+	g.ch.Close()
 }

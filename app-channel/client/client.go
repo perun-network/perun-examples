@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,121 +15,149 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"math/big"
+	"perun.network/perun-examples/app-channel/app"
 	"sync"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
-	"perun.network/go-perun/backend/ethereum/bindings/assetholdereth"
-	ewallet "perun.network/go-perun/backend/ethereum/wallet"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-examples/app-channel/app"
+
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 )
 
-type ClientConfig struct {
-	PerunClientConfig
-	ChallengeDuration time.Duration
-	AppAddress        common.Address
-	ContextTimeout    time.Duration
+const (
+	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
+	proposerIdx     = 0 // Participant index of the proposer.  //TODO:go-perun expose channel.ProposerIdx and ReceiverIdx.
+	receiverIdx     = 1 // Participant index of the receiver.
+)
+
+// GameClient is a payment channel client.
+type GameClient struct {
+	perunClient *client.Client       // The core Perun client.
+	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset        // The currency we expect to get paid in.
+	games       map[channel.ID]*Game // A registry to store the games.
+	gamesMtx    sync.RWMutex         // A mutex to protect the game registry from concurrent access.
 }
 
-type Client struct {
-	sync.Mutex
-	PerunClient       *PerunClient
-	AssetHolderAddr   common.Address
-	AssetHolder       *assetholdereth.AssetHolderETH
-	Games             map[channel.ID]*Game
-	ChallengeDuration time.Duration
-	AppAddress        common.Address
-	ContextTimeout    time.Duration
-	GameProposals     chan *GameProposal
-}
-
-func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := setupPerunClient(cfg.PerunClientConfig)
+// SetupGameClient creates a new payment client.
+func SetupGameClient(
+	bus wire.Bus,
+	w *swallet.Wallet,
+	acc common.Address,
+	nodeURL string,
+	chainID uint64,
+	adjudicator common.Address,
+	assetHolder common.Address,
+) (*GameClient, error) {
+	// Create Ethereum client and contract backend.
+	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating perun client")
+		return nil, fmt.Errorf("creating contract backend: %w", err)
 	}
 
-	ah, err := assetholdereth.NewAssetHolderETH(cfg.AssetHolderAddr, perunClient.ContractBackend)
+	// Validate contracts.
+	err = ethchannel.ValidateAdjudicator(context.TODO(), cb, adjudicator)
 	if err != nil {
-		return nil, errors.WithMessage(err, "loading asset holder")
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
+	}
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, assetHolder, adjudicator)
+	if err != nil {
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
-	c := &Client{
-		sync.Mutex{},
-		perunClient,
-		cfg.AssetHolderAddr,
-		ah,
-		make(map[channel.ID]*Game),
-		cfg.ChallengeDuration,
-		cfg.AppAddress,
-		cfg.ContextTimeout,
-		make(chan *GameProposal, 1),
+	// Setup funder.
+	funder := ethchannel.NewFunder(cb)
+	asset := *NewAsset(assetHolder)
+	dep := ethchannel.NewETHDepositor()
+	ethAcc := accounts.Account{Address: acc}
+	funder.RegisterAsset(asset, dep, ethAcc)
+
+	// Setup adjudicator.
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+
+	// Setup dispute watcher.
+	watcher, err := local.NewWatcher(adj)
+	if err != nil {
+		return nil, fmt.Errorf("intializing watcher: %w", err)
 	}
 
-	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(cfg.AppAddress))
-	channel.RegisterApp(_app)
+	// Setup Perun client.
+	waddr := ethwallet.AsWalletAddr(acc)
+	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	if err != nil {
+		return nil, errors.WithMessage(err, "creating client")
+	}
 
-	go c.PerunClient.StateChClient.Handle(c, c)
-	go c.PerunClient.Bus.Listen(c.PerunClient.Listener)
+	// Create client and start request handler.
+	c := &GameClient{
+		perunClient: perunClient,
+		account:     waddr,
+		currency:    &asset,
+		games:       map[channel.ID]*Game{},
+	}
+	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *Client) ProposeGame(opponent common.Address, stake *big.Int) (*Game, error) {
-	c.Lock()
-	defer c.Unlock()
+func (c *GameClient) ProposeGame(peer *GameClient, asset channel.Asset, appAddress common.Address, amount uint64) (Game, channel.ID) {
+	participants := []wire.Address{c.account, peer.account}
 
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(c.AppAddress))
-	peers := []wire.Address{c.PerunClient.Account.Address(), ewallet.AsWalletAddr(opponent)}
+	// We create an initial allocation which defines the starting balances.
+	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
+	initAlloc.SetAssetBalances(asset, []channel.Bal{
+		new(big.Int).SetUint64(amount), // Our initial balance.
+		big.NewInt(0),                  // Peer's initial balance.
+	})
+
+	// Prepare the channel proposal by defining the channel parameters.
+	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
+
+	_app := app.NewTicTacToeApp(ethwallet.AsWalletAddr(appAddress))
 	withApp := client.WithApp(_app, _app.InitData(0))
 
-	prop, err := client.NewLedgerChannelProposal(
-		c.challengeDurationInSeconds(),
-		c.PerunAddress(),
-		makeStakeAllocation(c.AssetHolderAddr, stake),
-		peers,
+	proposal, err := client.NewLedgerChannelProposal(
+		challengeDuration,
+		c.account,
+		initAlloc,
+		participants,
 		withApp,
 	)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating channel proposal")
+		panic(err)
 	}
 
-	perunChannel, err := c.PerunClient.StateChClient.ProposeChannel(ctx, prop)
+	// Send the game proposal
+	perunChannel, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
-		return nil, errors.WithMessage(err, "proposing channel")
+		panic(err)
 	}
-	g := c.newGame(perunChannel)
-	return g, nil
+
+	g := newGame(perunChannel)
+
+	c.gamesMtx.Lock()
+	c.games[perunChannel.ID()] = g
+	c.gamesMtx.Unlock()
+
+	return *g, perunChannel.ID()
 }
 
-func (c *Client) NextGameProposal() (*GameProposal, error) {
-	p, ok := <-c.GameProposals
-	if !ok {
-		return nil, fmt.Errorf("channel closed")
-	}
-	return p, nil
+func (c *GameClient) GetGame(id channel.ID) Game { // TODO:question - How can we do this better? Not the prettiest option to let the opponent access the accepted channel/app
+	return *c.games[id]
 }
 
-func (c *Client) newGame(perunChannel *client.Channel) *Game {
-	g := &Game{
-		sync.Mutex{},
-		c,
-		perunChannel,
-		perunChannel.State().Clone(),
-		make(chan error, 1),
-	}
-	c.Games[perunChannel.ID()] = g
-	// Start the on-chain watcher.
-	go func() {
-		g.errs <- g.ch.Watch(c)
-	}()
-	return g
+// Shutdown gracefully shuts down the client.
+func (c *GameClient) Shutdown() {
+	c.perunClient.Close()
 }

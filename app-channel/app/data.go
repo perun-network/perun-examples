@@ -42,7 +42,7 @@ func (d *TicTacToeAppData) Clone() channel.Data {
 }
 
 func (d *TicTacToeAppData) Set(x, y int, actorIdx channel.Index) {
-	if d.NextActor != uint8safe(actorIdx) {
+	if d.NextActor != uint8safe(uint16(actorIdx)) {
 		panic("invalid actor")
 	}
 	v := makeFieldValueFromPlayerIdx(actorIdx)

@@ -103,7 +103,7 @@ func (a *TicTacToeApp) ValidTransition(params *channel.Params, from, to *channel
 	}
 
 	// Check actor.
-	if fromData.NextActor != uint8safe(idx) {
+	if fromData.NextActor != uint8safe(uint16(idx)) {
 		return fmt.Errorf("invalid actor: expected %v, got %v", fromData.NextActor, idx)
 	}
 

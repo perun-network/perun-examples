@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,115 +15,129 @@
 package client
 
 import (
+	"context"
 	"fmt"
+	"math/big"
+	"perun.network/perun-examples/app-channel/app"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
-	"perun.network/go-perun/log"
-	"perun.network/perun-examples/app-channel/app"
 )
 
-func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *client.ProposalResponder) {
-	c.Lock()
-	defer c.Unlock()
+// HandleProposal is the callback for incoming channel proposals.
+func (c *GameClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
+	lcp, err := func() (*client.LedgerChannelProposal, error) {
+		// Ensure that we got a ledger channel proposal.
+		lcp, ok := p.(*client.LedgerChannelProposal)
+		if !ok {
+			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
+		}
 
-	var err error
-	defer func() {
+		// Ensure the ledger channel proposal includes the expected app
+		_, ok = lcp.App.(*app.TicTacToeApp) // TODO:question - is the check sufficient this way?
+		if !ok {
+			return nil, fmt.Errorf("Invalid app type ")
+		}
+
+		// Check that we have the correct number of participants.
+		if lcp.NumPeers() != 2 { //TODO:go-perun rename NumPeers to NumParts, Peers to Participants anywhere where all parties are referred to
+			return nil, fmt.Errorf("Invalid number of participants: %d", lcp.NumPeers())
+		}
+
+		// Check that the channel has the expected assets.
+		err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.currency})
 		if err != nil {
-			log.Error(err)
+			return nil, fmt.Errorf("Invalid assets: %v\n", err)
+		}
+
+		// Check that we do not need to fund anything.
+		zeroBal := big.NewInt(0)
+		for _, bals := range lcp.FundingAgreement {
+			bal := bals[receiverIdx]
+			if bal.Cmp(zeroBal) != 0 {
+				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
+			}
+		}
+		return lcp, nil
+	}()
+	if err != nil {
+		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
+	}
+
+	// Create a channel accept message and send it.
+	accept := lcp.Accept(
+		c.account,                // The account we use in the channel.
+		client.WithRandomNonce(), // Our share of the channel nonce.
+	)
+	ch, err := r.Accept(context.TODO(), accept)
+	if err != nil {
+		fmt.Printf("Error accepting channel proposal: %v\n", err)
+		return
+	}
+
+	// Store channel.
+	c.gamesMtx.Lock()
+	c.games[ch.ID()] = newGame(ch)
+	c.gamesMtx.Unlock()
+
+	// Start the on-chain event watcher. It automatically handles disputes.
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			// Panic because if the watcher is not running, we are no longer
+			// protected against registration of old states.
+			panic(fmt.Sprintf("Watcher returned with error: %v", err))
 		}
 	}()
-
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	_proposal, ok := proposal.(*client.LedgerChannelProposal)
-	if !ok {
-		err = responder.Reject(ctx, "accepting only ledger channel proposals")
-		return
-	} else if _, ok = _proposal.App.(*app.TicTacToeApp); !ok {
-		err = responder.Reject(ctx, "accepting only tic tac toe app channels")
-		return
-	}
-
-	prop := &GameProposal{
-		ch:       proposal,
-		response: make(chan bool),
-		result:   make(chan *ProposalResult),
-	}
-	c.GameProposals <- prop
-	select {
-	case <-ctx.Done():
-		err = responder.Reject(ctx, "proposal response timeout")
-		return
-	case r := <-prop.response:
-		if !r {
-			err = responder.Reject(ctx, "game proposal rejected")
-			return
-		}
-	}
-
-	accept := _proposal.Accept(c.PerunAddress(), client.WithRandomNonce())
-	ch, err := responder.Accept(ctx, accept)
-	prop.result <- &ProposalResult{c.newGame(ch), err}
 }
 
-func (c *Client) HandleUpdate(cur *channel.State, update client.ChannelUpdate, responder *client.UpdateResponder) {
-	c.Lock()
-	defer c.Unlock()
-
-	var err error
-	defer func() {
+// HandleUpdate is the callback for incoming channel updates.
+func (c *GameClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
+	// We accept every update that increases our balance.
+	err := func() error {
+		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
 		if err != nil {
-			log.Error(err)
+			return fmt.Errorf("Invalid assets: %v ", err)
 		}
+
+		g, ok := c.games[next.State.ID]
+		if !ok {
+			return fmt.Errorf("Unknown channel ")
+		}
+
+		_app, ok := g.ch.Params().App.(*app.TicTacToeApp)
+		if !ok {
+			return fmt.Errorf("Invalid app ")
+		}
+
+		err = _app.ValidTransition(g.ch.Params(), g.ch.State().Clone(), next.State, next.ActorIdx) //TODO:question - Is a deep copy of state (clone()) necessary here?
+		if err != nil {
+			return fmt.Errorf("Invalid action: %v ", err)
+		}
+		return nil
 	}()
-
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-
-	g, ok := c.Games[update.State.ID]
-	if !ok {
-		err = responder.Reject(ctx, "unknown channel")
-		return
-	}
-
-	_app, ok := g.ch.Params().App.(*app.TicTacToeApp)
-	if !ok {
-		err = responder.Reject(ctx, "invalid app")
-		return
-	}
-
-	err = _app.ValidTransition(g.ch.Params(), g.state, update.State, update.ActorIdx)
 	if err != nil {
-		err = responder.Reject(ctx, fmt.Sprintf("invalid action: %v", err))
-		return
+		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
 	}
 
-	err = responder.Accept(ctx)
+	// Send the acceptance message.
+	err = r.Accept(context.TODO())
 	if err != nil {
-		g.errs <- err
+		panic(err)
 	}
-
-	g.state = update.State.Clone()
 }
 
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
-	log.Info("Adjudicator event: %+v", e)
+// HandleAdjudicatorEvent is the callback for smart contract events.
+func (c *GameClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
 	switch e := e.(type) {
 	case *channel.ConcludedEvent:
-		c.Lock()
-		defer c.Unlock()
+		c.gamesMtx.RLock()
+		ch := c.games[e.ID()]
+		c.gamesMtx.RUnlock()
 
-		g, ok := c.Games[e.ID()]
-		if !ok {
-			log.Panicf("channel %v not found", e.ID())
-		}
-
-		err := g.ch.Close()
+		err := ch.ch.Settle(context.TODO(), false)
 		if err != nil {
-			log.Error(err)
+			panic(err)
 		}
-		delete(c.Games, e.ID())
 	}
 }
