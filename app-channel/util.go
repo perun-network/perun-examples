@@ -42,10 +42,6 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 		panic(err)
 	}
 	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
-	tops, err := cb.NewTransactor(context.TODO(), ethchannel.GasLimit, acc) // TODO:question - Can we work around creating new transaction ops here?
-	if err != nil {
-		panic(err)
-	}
 
 	// Deploy adjudicator.
 	adj, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc) //TODO:go-perun accept ethwallet Account instead?
@@ -53,14 +49,18 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 		panic(err)
 	}
 
-	// Deploy TicTacToe App.
-	app, _, _, err = ticTacToeApp.DeployTicTacToeApp(tops, cb)
+	// Deploy asset holder.
+	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO:go-perun accept ethwallet Account instead?
 	if err != nil {
 		panic(err)
 	}
 
-	// Deploy asset holder.
-	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO:go-perun accept ethwallet Account instead?
+	tops, err := cb.NewTransactor(context.TODO(), ethchannel.GasLimit, acc) // TODO:question - Can we work around creating new transaction ops here?
+	if err != nil {
+		panic(err)
+	}
+	// Deploy TicTacToe App.
+	app, _, _, err = ticTacToeApp.DeployTicTacToeApp(tops, cb)
 	if err != nil {
 		panic(err)
 	}
