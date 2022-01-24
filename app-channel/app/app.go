@@ -17,6 +17,7 @@ package app
 import (
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/pkg/errors"
 
@@ -159,6 +160,7 @@ func (a *TicTacToeApp) Set(s *channel.State, x, y int, actorIdx channel.Index) e
 	}
 
 	d.Set(x, y, actorIdx)
+	log.Println("\n" + d.String())
 
 	if isFinal, winner := d.CheckFinal(); isFinal {
 		s.IsFinal = true

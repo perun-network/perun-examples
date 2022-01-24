@@ -43,7 +43,7 @@ func CreateContractBackend(
 }
 
 // AccountAddress returns the account address of the client.
-func (c *GameClient) AccountAddress() common.Address {
+func (c *AppClient) AccountAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
 }
 

@@ -53,33 +53,52 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	_alice, chID := alice.ProposeGame(bob, asset, tikTakToeApp, 10)
-	_bob := bob.GetGame(chID)
+	_alice, chID := alice.ProposeApp(bob, asset, tikTakToeApp, 10)
+	_bob := bob.GetApp(chID)
 
+	log.Println("Start playing.")
+	log.Println("Alice's turn.")
 	// Alice set (2, 0)
 	_alice.Set(2, 0)
 
+	log.Println("Bob's turn.")
 	// Bob set (0, 0)
 	_bob.Set(0, 0)
 
+	log.Println("Alice's turn.")
 	// Alice set (0, 2)
 	_alice.Set(0, 2)
 
+	log.Println("Bob's turn.")
 	// Bob set (1, 1)
 	_bob.Set(1, 1)
 
+	log.Println("Alice's turn.")
 	// Alice set (2, 2)
 	_alice.Set(2, 2)
 
+	log.Println("Bob's turn.")
 	// Bob set (2, 1)
 	_bob.Set(2, 1)
 
+	log.Println("Alice's turn.")
 	// Alice set (1, 2)
-	_alice.Set(1, 2)
+	_alice.Set(1, 0)
 
+	log.Println("Bob's turn.")
+	// Bob set (2, 1)
+	_bob.Set(0, 1)
+
+	log.Println("Bob's wins.")
+	log.Println("Closing channel.")
 	// Alice concludes
 	_alice.Settle()
 
+	// Print balances after transactions.
+	l.LogBalances(alice, bob)
+
+	// Shutdown.
+	log.Println("Shutting down.")
 	alice.Shutdown()
 	bob.Shutdown()
 }

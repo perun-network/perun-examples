@@ -41,17 +41,17 @@ const (
 	receiverIdx     = 1 // Participant index of the receiver.
 )
 
-// GameClient is a payment channel client.
-type GameClient struct {
+// AppClient is a payment channel client.
+type AppClient struct {
 	perunClient *client.Client       // The core Perun client.
 	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
 	currency    channel.Asset        // The currency we expect to get paid in.
-	games       map[channel.ID]*Game // A registry to store the games.
-	gamesMtx    sync.RWMutex         // A mutex to protect the game registry from concurrent access.
+	apps        map[channel.ID]*Game // A registry to store the apps.
+	appsMtx     sync.RWMutex         // A mutex to protect the app registry from concurrent access.
 }
 
-// SetupGameClient creates a new payment client.
-func SetupGameClient(
+// SetupAppClient creates a new payment client.
+func SetupAppClient(
 	bus wire.Bus,
 	w *swallet.Wallet,
 	acc common.Address,
@@ -59,7 +59,7 @@ func SetupGameClient(
 	chainID uint64,
 	adjudicator common.Address,
 	assetHolder common.Address,
-) (*GameClient, error) {
+) (*AppClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
@@ -100,32 +100,32 @@ func SetupGameClient(
 	}
 
 	// Create client and start request handler.
-	c := &GameClient{
+	c := &AppClient{
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
-		games:       map[channel.ID]*Game{},
+		apps:        map[channel.ID]*Game{},
 	}
 	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *GameClient) ProposeGame(peer *GameClient, asset channel.Asset, appAddress common.Address, amount uint64) (Game, channel.ID) {
+func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress common.Address, amount uint64) (*Game, channel.ID) { // TODO:question We use pointer here (instead of the real value
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
 	initAlloc.SetAssetBalances(asset, []channel.Bal{
 		new(big.Int).SetUint64(amount), // Our initial balance.
-		big.NewInt(0),                  // Peer's initial balance.
+		new(big.Int).SetUint64(amount), // Peer's initial balance.
 	})
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 
 	_app := app.NewTicTacToeApp(ethwallet.AsWalletAddr(appAddress))
-	withApp := client.WithApp(_app, _app.InitData(0))
+	withApp := client.WithApp(_app, _app.InitData(proposerIdx))
 
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
@@ -146,18 +146,18 @@ func (c *GameClient) ProposeGame(peer *GameClient, asset channel.Asset, appAddre
 
 	g := newGame(perunChannel)
 
-	c.gamesMtx.Lock()
-	c.games[perunChannel.ID()] = g
-	c.gamesMtx.Unlock()
+	c.appsMtx.Lock()
+	c.apps[perunChannel.ID()] = g
+	c.appsMtx.Unlock()
 
-	return *g, perunChannel.ID()
+	return g, perunChannel.ID()
 }
 
-func (c *GameClient) GetGame(id channel.ID) Game { // TODO:question - How can we do this better? Not the prettiest option to let the opponent access the accepted channel/app
-	return *c.games[id]
+func (c *AppClient) GetApp(id channel.ID) *Game { // TODO:question - How can we do this better? Not the prettiest option to let the opponent access the accepted channel/app
+	return c.apps[id]
 }
 
 // Shutdown gracefully shuts down the client.
-func (c *GameClient) Shutdown() {
+func (c *AppClient) Shutdown() {
 	c.perunClient.Close()
 }

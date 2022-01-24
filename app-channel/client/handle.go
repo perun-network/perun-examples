@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"perun.network/perun-examples/app-channel/app"
 
@@ -25,7 +26,7 @@ import (
 )
 
 // HandleProposal is the callback for incoming channel proposals.
-func (c *GameClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
+func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
 	lcp, err := func() (*client.LedgerChannelProposal, error) {
 		// Ensure that we got a ledger channel proposal.
 		lcp, ok := p.(*client.LedgerChannelProposal)
@@ -50,14 +51,15 @@ func (c *GameClient) HandleProposal(p client.ChannelProposal, r *client.Proposal
 			return nil, fmt.Errorf("Invalid assets: %v\n", err)
 		}
 
-		// Check that we do not need to fund anything.
-		zeroBal := big.NewInt(0)
+		// Check that we fund the expected amount.
+		expectedBal := big.NewInt(10)
 		for _, bals := range lcp.FundingAgreement {
 			bal := bals[receiverIdx]
-			if bal.Cmp(zeroBal) != 0 {
+			if bal.Cmp(expectedBal) != 0 {
 				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
 			}
 		}
+
 		return lcp, nil
 	}()
 	if err != nil {
@@ -76,10 +78,11 @@ func (c *GameClient) HandleProposal(p client.ChannelProposal, r *client.Proposal
 	}
 
 	// Store channel.
-	c.gamesMtx.Lock()
-	c.games[ch.ID()] = newGame(ch)
-	c.gamesMtx.Unlock()
+	c.appsMtx.Lock()
+	c.apps[ch.ID()] = newGame(ch)
+	c.appsMtx.Unlock()
 
+	log.Println("Channel proposal accepted.")
 	// Start the on-chain event watcher. It automatically handles disputes.
 	go func() {
 		err := ch.Watch(c)
@@ -92,15 +95,15 @@ func (c *GameClient) HandleProposal(p client.ChannelProposal, r *client.Proposal
 }
 
 // HandleUpdate is the callback for incoming channel updates.
-func (c *GameClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
-	// We accept every update that increases our balance.
+func (c *AppClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
+	// We accept every update that is a valid transition of the game/app.
 	err := func() error {
 		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
 		if err != nil {
-			return fmt.Errorf("Invalid assets: %v ", err)
+			return err
 		}
 
-		g, ok := c.games[next.State.ID]
+		g, ok := c.apps[next.State.ID]
 		if !ok {
 			return fmt.Errorf("Unknown channel ")
 		}
@@ -110,9 +113,9 @@ func (c *GameClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate,
 			return fmt.Errorf("Invalid app ")
 		}
 
-		err = _app.ValidTransition(g.ch.Params(), g.ch.State().Clone(), next.State, next.ActorIdx) //TODO:question - Is a deep copy of state (clone()) necessary here?
+		err = _app.ValidTransition(g.ch.Params(), g.state, next.State, next.ActorIdx) //TODO:question - Is a deep copy of state (clone()) necessary here? Does this have a performance impact?
 		if err != nil {
-			return fmt.Errorf("Invalid action: %v ", err)
+			return err
 		}
 		return nil
 	}()
@@ -128,12 +131,12 @@ func (c *GameClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate,
 }
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
-func (c *GameClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
+func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
 	switch e := e.(type) {
 	case *channel.ConcludedEvent:
-		c.gamesMtx.RLock()
-		ch := c.games[e.ID()]
-		c.gamesMtx.RUnlock()
+		c.appsMtx.RLock()
+		ch := c.apps[e.ID()]
+		c.appsMtx.RUnlock()
 
 		err := ch.ch.Settle(context.TODO(), false)
 		if err != nil {

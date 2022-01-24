@@ -74,7 +74,7 @@ func setupGameClient(
 	nodeURL string,
 	adjudicator, assetHolder common.Address,
 	privateKey string,
-) *client.GameClient {
+) *client.AppClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
@@ -84,7 +84,7 @@ func setupGameClient(
 	acc := crypto.PubkeyToAddress(k.PublicKey)
 
 	// Create and start client.
-	c, err := client.SetupGameClient(
+	c, err := client.SetupAppClient(
 		bus,
 		w,
 		acc,
@@ -115,7 +115,7 @@ func newBalanceLogger(chainURL string) balanceLogger {
 }
 
 // LogBalances prints the balances of the specified clients.
-func (l balanceLogger) LogBalances(clients ...*client.GameClient) {
+func (l balanceLogger) LogBalances(clients ...*client.AppClient) {
 	bals := make([]*big.Int, len(clients))
 	for i, c := range clients {
 		bal, err := l.ethClient.BalanceAt(context.TODO(), c.AccountAddress(), nil)
