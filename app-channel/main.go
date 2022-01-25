@@ -54,18 +54,19 @@ func main() {
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
 	_alice, chID := alice.ProposeApp(bob, asset, tikTakToeApp, 10)
-	_bob := bob.GetApp(chID)
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
 	// Alice set (2, 0)
 	_alice.Set(2, 0)
 
+	_bob := bob.GetApp(chID) //TODO:question I am not satisfied with this solution. + If called before _alice.Set(2, 0) it might fetch an empty game (because handler has not triggered yet)
+	//TODO:question The original implementation solved this by actively accepting the app proposal
 	log.Println("Bob's turn.")
 	// Bob set (0, 0)
 	_bob.Set(0, 0)
 
-	log.Println("Alice's turn.")
+	log.Println("Alice's turn.") //TODO:question Can we make the turn's appear "less instant" in the console output
 	// Alice set (0, 2)
 	_alice.Set(0, 2)
 
@@ -91,8 +92,9 @@ func main() {
 
 	log.Println("Bob's wins.")
 	log.Println("Closing channel.")
-	// Alice concludes
-	_alice.Settle()
+
+	// Bob concludes
+	_bob.Settle()
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)

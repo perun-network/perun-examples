@@ -111,7 +111,7 @@ func SetupAppClient(
 	return c, nil
 }
 
-func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress common.Address, amount uint64) (*Game, channel.ID) { // TODO:question We use pointer here (instead of the real value
+func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress common.Address, amount uint64) (*Game, channel.ID) {
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.

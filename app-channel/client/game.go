@@ -10,7 +10,7 @@ import (
 
 type Game struct {
 	ch    *client.Channel
-	state *channel.State
+	state *channel.State // TODO:question - Do we really need to store the state? Fetching it when needed did not work
 }
 
 func newGame(ch *client.Channel) *Game {
