@@ -54,48 +54,52 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	_alice, chID := alice.ProposeApp(bob, asset, app, 10)
+	appAlice, chID := alice.ProposeApp(bob, asset, app, 10)
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
 	// Alice set (2, 0)
-	_alice.Set(2, 0)
+	appAlice.Set(2, 0)
 
-	_bob := bob.GetApp(chID) //TODO:question I am not satisfied with this solution. + If called before _alice.Set(2, 0) it might fetch an empty game (because handler has not triggered yet)
+	appBob := bob.GetApp(chID) //TODO:question I am not satisfied with this solution. + If called before _alice.Set(2, 0) it might fetch an empty game (because handler has not triggered yet)
 	//TODO:question The original implementation solved this by actively accepting the app proposal
+	//TODO retrieve app via proposal response, e.g., using go channel
 	log.Println("Bob's turn.")
 	// Bob set (0, 0)
-	_bob.Set(0, 0)
+	appBob.Set(0, 0)
 
 	log.Println("Alice's turn.") //TODO:question Can we make the turn's appear "less instant" in the console output
 	// Alice set (0, 2)
-	_alice.Set(0, 2)
+	appAlice.Set(0, 2)
 
 	log.Println("Bob's turn.")
 	// Bob set (1, 1)
-	_bob.Set(1, 1)
+	appBob.Set(1, 1)
 
 	log.Println("Alice's turn.")
 	// Alice set (2, 2)
-	_alice.Set(2, 2)
+	appAlice.Set(2, 2)
 
 	log.Println("Bob's turn.")
 	// Bob set (2, 1)
-	_bob.Set(2, 1)
+	appBob.Set(2, 1)
 
 	log.Println("Alice's turn.")
 	// Alice set (1, 2)
-	_alice.Set(1, 0)
+	appAlice.Set(1, 0)
 
 	log.Println("Bob's turn.")
 	// Bob set (2, 1)
-	_bob.Set(0, 1)
+	appBob.Set(0, 1)
 
 	log.Println("Bob's wins.")
 	log.Println("Closing channel.")
 
+	//TODO Include dispute? Or separate tutorial?
+
 	// Bob concludes
-	_bob.Settle()
+	appBob.Settle()
+	//TODO settle alice
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)
