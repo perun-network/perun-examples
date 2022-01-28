@@ -46,8 +46,3 @@ func CreateContractBackend(
 func (c *PaymentClient) AccountAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
 }
-
-// NewAsset creates an Ethereum channel asset from an Ethereum address.
-func NewAsset(assetHolder common.Address) *ethchannel.Asset {
-	return ethwallet.AsWalletAddr(assetHolder) // Convert to ethwallet.Address, which implements channel.Asset. //TODO:go-perun create ethchannel.AsAsset
-}

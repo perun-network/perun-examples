@@ -10,7 +10,8 @@ import (
 
 // PaymentChannel is a wrapper for a Perun channel for the payment use case.
 type PaymentChannel struct {
-	ch *client.Channel
+	ch       *client.Channel
+	currency channel.Asset
 }
 
 // newPaymentChannel creates a new payment channel.
@@ -19,12 +20,12 @@ func newPaymentChannel(ch *client.Channel) *PaymentChannel {
 }
 
 // SendPayment sends a payment to the channel peer.
-func (c PaymentChannel) SendPayment(asset channel.Asset, amount uint64) {
+func (c PaymentChannel) SendPayment(amount uint64) {
 	// Transfer the given amount from us to peer.
 	// Use UpdateBy to update the channel state.
 	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { // We use context.TODO to keep the code simple.
 		ethAmount := new(big.Int).SetUint64(amount)
-		state.Allocation.TransferBalance(proposerIdx, receiverIdx, asset, ethAmount)
+		state.Allocation.TransferBalance(proposerIdx, receiverIdx, c.currency, ethAmount)
 		return nil
 	})
 	if err != nil {
