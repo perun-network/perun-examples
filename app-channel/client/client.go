@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"perun.network/perun-examples/app-channel/app"
 	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
@@ -29,6 +28,7 @@ import (
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
+	"perun.network/perun-examples/app-channel/app"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,9 +43,10 @@ const (
 
 // AppClient is a payment channel client.
 type AppClient struct {
-	perunClient *client.Client       // The core Perun client.
-	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset        // The currency we expect to get paid in.
+	perunClient *client.Client // The core Perun client.
+	account     wallet.Address // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset  // The currency we expect to get paid in.
+	app         *app.TicTacToeApp
 	apps        map[channel.ID]*Game // A registry to store the apps.
 	appsMtx     sync.RWMutex         // A mutex to protect the app registry from concurrent access.
 }
@@ -59,6 +60,7 @@ func SetupAppClient(
 	chainID uint64,
 	adjudicator common.Address,
 	assetHolder common.Address,
+	app *app.TicTacToeApp,
 ) (*AppClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -104,6 +106,7 @@ func SetupAppClient(
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
+		app:         app,
 		apps:        map[channel.ID]*Game{},
 	}
 	go perunClient.Handle(c, c)
@@ -111,7 +114,7 @@ func SetupAppClient(
 	return c, nil
 }
 
-func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress common.Address, amount uint64) (*Game, channel.ID) {
+func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset, amount uint64) (*Game, channel.ID) {
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
@@ -123,9 +126,7 @@ func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress 
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
-
-	_app := app.NewTicTacToeApp(ethwallet.AsWalletAddr(appAddress))
-	withApp := client.WithApp(_app, _app.InitData(proposerIdx))
+	withApp := client.WithApp(c.app, c.app.InitData(proposerIdx))
 
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,

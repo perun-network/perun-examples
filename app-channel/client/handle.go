@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+
 	"perun.network/perun-examples/app-channel/app"
 
 	"perun.network/go-perun/channel"
@@ -34,9 +35,8 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
 		}
 
-		// Ensure the ledger channel proposal includes the expected app
-		_, ok = lcp.App.(*app.TicTacToeApp) // TODO:question - is the check sufficient this way?
-		if !ok {
+		// Ensure the ledger channel proposal includes the expected app.
+		if !lcp.App.Def().Equals(c.app.Def()) {
 			return nil, fmt.Errorf("Invalid app type ")
 		}
 

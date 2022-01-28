@@ -18,6 +18,8 @@ import (
 	"context"
 	"log"
 	"math/big"
+
+	"perun.network/perun-examples/app-channel/app"
 	"perun.network/perun-examples/app-channel/contracts/generated/ticTacToeApp"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -74,6 +76,7 @@ func setupGameClient(
 	nodeURL string,
 	adjudicator, assetHolder common.Address,
 	privateKey string,
+	app *app.TicTacToeApp,
 ) *client.AppClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
@@ -92,6 +95,7 @@ func setupGameClient(
 		chainID,
 		adjudicator,
 		assetHolder,
+		app,
 	)
 	if err != nil {
 		panic(err)

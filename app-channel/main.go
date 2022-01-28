@@ -17,7 +17,9 @@ package main
 import (
 	"log"
 
+	"perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
+	"perun.network/perun-examples/app-channel/app"
 	"perun.network/perun-examples/app-channel/client"
 )
 
@@ -39,14 +41,15 @@ const (
 func main() {
 	// Deploy contracts.
 	log.Println("Deploying contracts.")
-	adjudicator, assetHolder, app := deployContracts(chainURL, chainID, keyDeployer)
+	adjudicator, assetHolder, appAddress := deployContracts(chainURL, chainID, keyDeployer)
 	asset := client.NewAsset(assetHolder)
+	app := app.NewTicTacToeApp(wallet.AsWalletAddr(appAddress))
 
 	// Setup clients.
 	log.Println("Setting up clients.")
 	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial Extension that explains tcp/ip bus.
-	alice := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyAlice)
-	bob := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyBob)
+	alice := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyAlice, app)
+	bob := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyBob, app)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
@@ -54,7 +57,7 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	appAlice, chID := alice.ProposeApp(bob, asset, app, 10)
+	appAlice, chID := alice.ProposeAppChannel(bob, asset, 10)
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
