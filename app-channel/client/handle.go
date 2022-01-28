@@ -79,7 +79,7 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 
 	// Store channel.
 	c.appsMtx.Lock()
-	c.apps[ch.ID()] = newGame(ch)
+	c.games[ch.ID()] = newGame(ch)
 	c.appsMtx.Unlock()
 
 	log.Println("Channel proposal accepted.")
@@ -103,7 +103,7 @@ func (c *AppClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, 
 			return err
 		}
 
-		g, ok := c.apps[next.State.ID]
+		g, ok := c.games[next.State.ID]
 		if !ok {
 			return fmt.Errorf("Unknown channel ")
 		}
@@ -135,7 +135,7 @@ func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:
 	switch e := e.(type) {
 	case *channel.ConcludedEvent:
 		c.appsMtx.RLock()
-		ch := c.apps[e.ID()]
+		ch := c.games[e.ID()]
 		c.appsMtx.RUnlock()
 
 		err := ch.ch.Settle(context.TODO(), false)

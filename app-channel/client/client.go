@@ -47,7 +47,7 @@ type AppClient struct {
 	account     wallet.Address // The account we use for on-chain and off-chain transactions.
 	currency    channel.Asset  // The currency we expect to get paid in.
 	app         *app.TicTacToeApp
-	apps        map[channel.ID]*Game // A registry to store the apps.
+	games       map[channel.ID]*Game // A registry to store the apps.
 	appsMtx     sync.RWMutex         // A mutex to protect the app registry from concurrent access.
 }
 
@@ -107,7 +107,7 @@ func SetupAppClient(
 		account:     waddr,
 		currency:    &asset,
 		app:         app,
-		apps:        map[channel.ID]*Game{},
+		games:       map[channel.ID]*Game{},
 	}
 	go perunClient.Handle(c, c)
 
@@ -148,14 +148,14 @@ func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset, amou
 	g := newGame(perunChannel)
 
 	c.appsMtx.Lock()
-	c.apps[perunChannel.ID()] = g
+	c.games[perunChannel.ID()] = g
 	c.appsMtx.Unlock()
 
 	return g, perunChannel.ID()
 }
 
 func (c *AppClient) GetApp(id channel.ID) *Game { // TODO:question - How can we do this better? Not the prettiest option to let the opponent access the accepted channel/app
-	return c.apps[id]
+	return c.games[id]
 }
 
 // Shutdown gracefully shuts down the client.
