@@ -72,6 +72,10 @@ func main() {
 	appBob.Set(0, 0)
 
 	log.Println("Alice's turn.") //TODO:question Can we make the turn's appear "less instant" in the console output
+	//TODO:answer You can insert time.sleep(...), but this will just slow down
+	//the updates without additional user feedback. Another alternative would be
+	//to let the user interactively enter the actions via stdin.
+
 	// Alice set (0, 2)
 	appAlice.Set(0, 2)
 
