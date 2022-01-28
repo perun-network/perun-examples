@@ -63,12 +63,12 @@ func main() {
 
 	log.Println("Settling channel.")
 	ch.Settle()
+	//TODO wait until bob settled
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)
 
-	// Shutdown.
-	log.Println("Shutting down.")
+	// Cleanup.
 	alice.Shutdown()
 	bob.Shutdown()
 }
