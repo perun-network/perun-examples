@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/client"
 )
@@ -77,6 +78,7 @@ func setupGameClient(
 	adjudicator, assetHolder common.Address,
 	privateKey string,
 	app *app.TicTacToeApp,
+	stake channel.Bal,
 ) *client.AppClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
@@ -96,6 +98,7 @@ func setupGameClient(
 		adjudicator,
 		assetHolder,
 		app,
+		stake,
 	)
 	if err != nil {
 		panic(err)

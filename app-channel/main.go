@@ -16,6 +16,7 @@ package main
 
 import (
 	"log"
+	"math/big"
 
 	"perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
@@ -48,8 +49,9 @@ func main() {
 	// Setup clients.
 	log.Println("Setting up clients.")
 	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial Extension that explains tcp/ip bus.
-	alice := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyAlice, app)
-	bob := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyBob, app)
+	stake := big.NewInt(10)
+	alice := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyAlice, app, stake)
+	bob := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyBob, app, stake)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
@@ -57,7 +59,7 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	appAlice, chID := alice.ProposeAppChannel(bob, asset, 10)
+	appAlice, chID := alice.ProposeAppChannel(bob, asset)
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
@@ -95,20 +97,19 @@ func main() {
 	// Bob set (2, 1)
 	appBob.Set(0, 1)
 
-	log.Println("Bob's wins.")
-	log.Println("Closing channel.")
+	log.Println("Bob wins.")
+	log.Println("Payout.")
 
 	//TODO Include dispute? Or separate tutorial?
 
-	// Bob concludes
+	// Payout.
+	appAlice.Settle()
 	appBob.Settle()
-	//TODO settle alice
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)
 
-	// Shutdown.
-	log.Println("Shutting down.")
+	// Cleanup.
 	alice.Shutdown()
 	bob.Shutdown()
 }

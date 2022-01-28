@@ -18,9 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/big"
-
-	"perun.network/perun-examples/app-channel/app"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -52,12 +49,10 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 		}
 
 		// Check that we fund the expected amount.
-		expectedBal := big.NewInt(10)
-		for _, bals := range lcp.FundingAgreement {
-			bal := bals[receiverIdx]
-			if bal.Cmp(expectedBal) != 0 {
-				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
-			}
+		assetIndex := 0
+		bal := lcp.FundingAgreement[assetIndex][receiverIdx]
+		if bal.Cmp(c.stake) != 0 {
+			return nil, fmt.Errorf("Invalid funding balance: %v", bal)
 		}
 
 		return lcp, nil
@@ -96,35 +91,9 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 
 // HandleUpdate is the callback for incoming channel updates.
 func (c *AppClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
-	// We accept every update that is a valid transition of the game/app.
-	err := func() error {
-		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
-		if err != nil {
-			return err
-		}
-
-		g, ok := c.games[next.State.ID]
-		if !ok {
-			return fmt.Errorf("Unknown channel ")
-		}
-
-		_app, ok := g.ch.Params().App.(*app.TicTacToeApp)
-		if !ok {
-			return fmt.Errorf("Invalid app ")
-		}
-
-		err = _app.ValidTransition(g.ch.Params(), g.state, next.State, next.ActorIdx) //TODO:question - Is a deep copy of state (clone()) necessary here? Does this have a performance impact?
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
-	if err != nil {
-		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
-	}
-
-	// Send the acceptance message.
-	err = r.Accept(context.TODO())
+	// Perun automatically checks that the transition is valid.
+	// We always accept.
+	err := r.Accept(context.TODO())
 	if err != nil {
 		panic(err)
 	}

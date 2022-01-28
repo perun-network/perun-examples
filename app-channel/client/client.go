@@ -17,7 +17,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
@@ -43,10 +42,11 @@ const (
 
 // AppClient is a payment channel client.
 type AppClient struct {
-	perunClient *client.Client // The core Perun client.
-	account     wallet.Address // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset  // The currency we expect to get paid in.
-	app         *app.TicTacToeApp
+	perunClient *client.Client       // The core Perun client.
+	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset        // The currency we expect to get paid in.
+	stake       channel.Bal          // The amount we put at stake.
+	app         *app.TicTacToeApp    // The app definition.
 	games       map[channel.ID]*Game // A registry to store the apps.
 	appsMtx     sync.RWMutex         // A mutex to protect the app registry from concurrent access.
 }
@@ -61,6 +61,7 @@ func SetupAppClient(
 	adjudicator common.Address,
 	assetHolder common.Address,
 	app *app.TicTacToeApp,
+	stake channel.Bal,
 ) (*AppClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -106,6 +107,7 @@ func SetupAppClient(
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
+		stake:       stake,
 		app:         app,
 		games:       map[channel.ID]*Game{},
 	}
@@ -114,14 +116,14 @@ func SetupAppClient(
 	return c, nil
 }
 
-func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset, amount uint64) (*Game, channel.ID) {
+func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset) (*Game, channel.ID) {
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
 	initAlloc.SetAssetBalances(asset, []channel.Bal{
-		new(big.Int).SetUint64(amount), // Our initial balance.
-		new(big.Int).SetUint64(amount), // Peer's initial balance.
+		c.stake, // Our initial balance.
+		c.stake, // Peer's initial balance.
 	})
 
 	// Prepare the channel proposal by defining the channel parameters.
