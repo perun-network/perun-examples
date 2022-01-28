@@ -93,6 +93,11 @@ func (a *TicTacToeApp) ValidInit(p *channel.Params, s *channel.State) error {
 
 // ValidTransition is called whenever the channel state transitions.
 func (a *TicTacToeApp) ValidTransition(params *channel.Params, from, to *channel.State, idx channel.Index) error {
+	err := channel.AssetsAssertEqual(from.Assets, to.Assets)
+	if err != nil {
+		return fmt.Errorf("Invalid assets: %v", err)
+	}
+
 	fromData, ok := from.Data.(*TicTacToeAppData)
 	if !ok {
 		panic(fmt.Sprintf("from state: invalid data type: %T", from.Data))
