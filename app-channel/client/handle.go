@@ -72,21 +72,10 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 		return
 	}
 
-	// Store channel.
-	c.appsMtx.Lock()
-	c.games[ch.ID()] = newGame(ch)
-	c.appsMtx.Unlock()
-
-	log.Println("Channel proposal accepted.")
 	// Start the on-chain event watcher. It automatically handles disputes.
-	go func() {
-		err := ch.Watch(c)
-		if err != nil {
-			// Panic because if the watcher is not running, we are no longer
-			// protected against registration of old states.
-			panic(fmt.Sprintf("Watcher returned with error: %v", err))
-		}
-	}()
+	c.startWatching(ch)
+
+	c.games <- newGame(ch)
 }
 
 // HandleUpdate is the callback for incoming channel updates.
@@ -100,16 +89,6 @@ func (c *AppClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, 
 }
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
-func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
-	switch e := e.(type) {
-	case *channel.ConcludedEvent:
-		c.appsMtx.RLock()
-		ch := c.games[e.ID()]
-		c.appsMtx.RUnlock()
-
-		err := ch.ch.Settle(context.TODO(), false)
-		if err != nil {
-			panic(err)
-		}
-	}
+func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
+	log.Println("Channel concluded", c.account)
 }

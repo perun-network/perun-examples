@@ -59,16 +59,14 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	appAlice, chID := alice.ProposeAppChannel(bob, asset)
+	appAlice := alice.ProposeAppChannel(bob, asset)
+	appBob := bob.AcceptedGame()
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
 	// Alice set (2, 0)
 	appAlice.Set(2, 0)
 
-	appBob := bob.GetApp(chID) //TODO:question I am not satisfied with this solution. + If called before _alice.Set(2, 0) it might fetch an empty game (because handler has not triggered yet)
-	//TODO:question The original implementation solved this by actively accepting the app proposal
-	//TODO retrieve app via proposal response, e.g., using go channel
 	log.Println("Bob's turn.")
 	// Bob set (0, 0)
 	appBob.Set(0, 0)

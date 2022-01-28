@@ -17,7 +17,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -42,13 +41,12 @@ const (
 
 // AppClient is a payment channel client.
 type AppClient struct {
-	perunClient *client.Client       // The core Perun client.
-	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset        // The currency we expect to get paid in.
-	stake       channel.Bal          // The amount we put at stake.
-	app         *app.TicTacToeApp    // The app definition.
-	games       map[channel.ID]*Game // A registry to store the apps.
-	appsMtx     sync.RWMutex         // A mutex to protect the app registry from concurrent access.
+	perunClient *client.Client    // The core Perun client.
+	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset     // The currency we expect to get paid in.
+	stake       channel.Bal       // The amount we put at stake.
+	app         *app.TicTacToeApp // The app definition.
+	games       chan *Game
 }
 
 // SetupAppClient creates a new payment client.
@@ -109,14 +107,14 @@ func SetupAppClient(
 		currency:    &asset,
 		stake:       stake,
 		app:         app,
-		games:       map[channel.ID]*Game{},
+		games:       make(chan *Game, 1),
 	}
 	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset) (*Game, channel.ID) {
+func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset) *Game {
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
@@ -142,22 +140,29 @@ func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset) (*Ga
 	}
 
 	// Send the game proposal
-	perunChannel, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
+	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		panic(err)
 	}
 
-	g := newGame(perunChannel)
+	// Start the on-chain event watcher. It automatically handles disputes.
+	c.startWatching(ch)
 
-	c.appsMtx.Lock()
-	c.games[perunChannel.ID()] = g
-	c.appsMtx.Unlock()
-
-	return g, perunChannel.ID()
+	return newGame(ch)
 }
 
-func (c *AppClient) GetApp(id channel.ID) *Game { // TODO:question - How can we do this better? Not the prettiest option to let the opponent access the accepted channel/app
-	return c.games[id]
+// startWatching starts the dispute watcher for the specified channel.
+func (c *AppClient) startWatching(ch *client.Channel) {
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			panic(err)
+		}
+	}()
+}
+
+func (c *AppClient) AcceptedGame() *Game {
+	return <-c.games
 }
 
 // Shutdown gracefully shuts down the client.
