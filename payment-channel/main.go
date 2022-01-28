@@ -54,16 +54,17 @@ func main() {
 
 	// Open channel, transact, close.
 	log.Println("Opening channel.")
-	ch := alice.OpenChannel(bob, 10)
+	chAlice := alice.OpenChannel(bob, 10)
+	chBob := bob.AcceptedChannel()
 
 	log.Println("Sending payments.")
-	ch.SendPayment(3)
-	ch.SendPayment(2)
-	ch.SendPayment(1)
+	chAlice.SendPayment(1)
+	chBob.SendPayment(2)
+	chAlice.SendPayment(3)
 
 	log.Println("Settling channel.")
-	ch.Settle()
-	//TODO wait until bob settled
+	chAlice.Settle() // Conclude and withdraw.
+	chBob.Settle()   // Withdraw.
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)

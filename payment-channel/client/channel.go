@@ -15,8 +15,11 @@ type PaymentChannel struct {
 }
 
 // newPaymentChannel creates a new payment channel.
-func newPaymentChannel(ch *client.Channel) *PaymentChannel {
-	return &PaymentChannel{ch: ch}
+func newPaymentChannel(ch *client.Channel, currency channel.Asset) *PaymentChannel {
+	return &PaymentChannel{
+		ch:       ch,
+		currency: currency,
+	}
 }
 
 // SendPayment sends a payment to the channel peer.
@@ -36,16 +39,18 @@ func (c PaymentChannel) SendPayment(amount uint64) {
 // Settle settles the payment channel and withdraws the funds.
 func (c PaymentChannel) Settle() {
 	// Finalize the channel to enable fast settlement.
-	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
-		state.IsFinal = true
-		return nil
-	})
-	if err != nil {
-		panic(err)
+	if !c.ch.State().IsFinal {
+		err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
+			state.IsFinal = true
+			return nil
+		})
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// Settle concludes the channel and withdraws the funds.
-	err = c.ch.Settle(context.TODO(), false)
+	err := c.ch.Settle(context.TODO(), false)
 	if err != nil {
 		panic(err)
 	}

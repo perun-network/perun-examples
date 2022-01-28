@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -42,11 +41,10 @@ const (
 
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
-	perunClient *client.Client                 // The core Perun client.
-	account     wallet.Address                 // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset                  // The currency we expect to get paid in.
-	channels    map[channel.ID]*PaymentChannel // A registry to store the channels.
-	channelsMtx sync.RWMutex                   // A mutex to protect the channel registry from concurrent access.
+	perunClient *client.Client       // The core Perun client.
+	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset        // The currency we expect to get paid in.
+	channels    chan *PaymentChannel // Accepted payment channels.
 }
 
 // SetupPaymentClient creates a new payment client.
@@ -102,7 +100,7 @@ func SetupPaymentClient(
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
-		channels:    map[channel.ID]*PaymentChannel{},
+		channels:    make(chan *PaymentChannel, 1),
 	}
 	go perunClient.Handle(c, c)
 
@@ -141,7 +139,27 @@ func (c *PaymentClient) OpenChannel(peer *PaymentClient, amount uint64) PaymentC
 		panic(err)
 	}
 
-	return *newPaymentChannel(ch)
+	// Start the on-chain event watcher. It automatically handles disputes.
+	c.startWatching(ch)
+
+	return *newPaymentChannel(ch, c.currency)
+}
+
+// startWatching starts the dispute watcher for the specified channel.
+func (c *PaymentClient) startWatching(ch *client.Channel) {
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			// Panic because if the watcher is not running, we are no longer
+			// protected against registration of old states.
+			panic(fmt.Sprintf("Watcher returned with error: %v", err))
+		}
+	}()
+}
+
+// AcceptedChannel returns the next accepted channel.
+func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
+	return <-c.channels
 }
 
 // Shutdown gracefully shuts down the client.
