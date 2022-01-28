@@ -16,6 +16,7 @@ package main
 
 import (
 	"log"
+
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/client"
 )
@@ -30,7 +31,7 @@ const (
 	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
-//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code in simple, but in production code one should always use proper context and handle error appropriately.
+//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code simple, but in production code one should always use proper context and handle error appropriately.
 
 // main runs a demo of the game client. It assumes that a blockchain node is
 // available at `chainURL` and that the accounts corresponding to the specified
@@ -38,7 +39,7 @@ const (
 func main() {
 	// Deploy contracts.
 	log.Println("Deploying contracts.")
-	adjudicator, assetHolder, tikTakToeApp := deployContracts(chainURL, chainID, keyDeployer)
+	adjudicator, assetHolder, app := deployContracts(chainURL, chainID, keyDeployer)
 	asset := client.NewAsset(assetHolder)
 
 	// Setup clients.
@@ -53,7 +54,7 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	_alice, chID := alice.ProposeApp(bob, asset, tikTakToeApp, 10)
+	_alice, chID := alice.ProposeApp(bob, asset, app, 10)
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
