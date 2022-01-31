@@ -17,9 +17,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"math/big"
-	"perun.network/perun-examples/app-channel/app"
-	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -29,6 +26,7 @@ import (
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
+	"perun.network/perun-examples/app-channel/app"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,11 +41,12 @@ const (
 
 // AppClient is a payment channel client.
 type AppClient struct {
-	perunClient *client.Client       // The core Perun client.
-	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset        // The currency we expect to get paid in.
-	apps        map[channel.ID]*Game // A registry to store the apps.
-	appsMtx     sync.RWMutex         // A mutex to protect the app registry from concurrent access.
+	perunClient *client.Client    // The core Perun client.
+	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset     // The currency we expect to get paid in.
+	stake       channel.Bal       // The amount we put at stake.
+	app         *app.TicTacToeApp // The app definition.
+	games       chan *Game
 }
 
 // SetupAppClient creates a new payment client.
@@ -59,6 +58,8 @@ func SetupAppClient(
 	chainID uint64,
 	adjudicator common.Address,
 	assetHolder common.Address,
+	app *app.TicTacToeApp,
+	stake channel.Bal,
 ) (*AppClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -104,28 +105,28 @@ func SetupAppClient(
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
-		apps:        map[channel.ID]*Game{},
+		stake:       stake,
+		app:         app,
+		games:       make(chan *Game, 1),
 	}
 	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress common.Address, amount uint64) (*Game, channel.ID) {
+func (c *AppClient) ProposeAppChannel(peer *AppClient, asset channel.Asset) *Game {
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
 	initAlloc.SetAssetBalances(asset, []channel.Bal{
-		new(big.Int).SetUint64(amount), // Our initial balance.
-		new(big.Int).SetUint64(amount), // Peer's initial balance.
+		c.stake, // Our initial balance.
+		c.stake, // Peer's initial balance.
 	})
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
-
-	_app := app.NewTicTacToeApp(ethwallet.AsWalletAddr(appAddress))
-	withApp := client.WithApp(_app, _app.InitData(proposerIdx))
+	withApp := client.WithApp(c.app, c.app.InitData(proposerIdx))
 
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
@@ -139,22 +140,29 @@ func (c *AppClient) ProposeApp(peer *AppClient, asset channel.Asset, appAddress 
 	}
 
 	// Send the game proposal
-	perunChannel, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
+	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		panic(err)
 	}
 
-	g := newGame(perunChannel)
+	// Start the on-chain event watcher. It automatically handles disputes.
+	c.startWatching(ch)
 
-	c.appsMtx.Lock()
-	c.apps[perunChannel.ID()] = g
-	c.appsMtx.Unlock()
-
-	return g, perunChannel.ID()
+	return newGame(ch)
 }
 
-func (c *AppClient) GetApp(id channel.ID) *Game { // TODO:question - How can we do this better? Not the prettiest option to let the opponent access the accepted channel/app
-	return c.apps[id]
+// startWatching starts the dispute watcher for the specified channel.
+func (c *AppClient) startWatching(ch *client.Channel) {
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			panic(err)
+		}
+	}()
+}
+
+func (c *AppClient) AcceptedGame() *Game {
+	return <-c.games
 }
 
 // Shutdown gracefully shuts down the client.

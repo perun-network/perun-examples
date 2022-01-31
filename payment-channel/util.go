@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
@@ -61,7 +62,8 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 func setupPaymentClient(
 	bus wire.Bus,
 	nodeURL string,
-	adjudicator, assetHolder common.Address,
+	adjudicator common.Address,
+	asset ethwallet.Address,
 	privateKey string,
 ) *client.PaymentClient {
 	// Create wallet and account.
@@ -80,7 +82,7 @@ func setupPaymentClient(
 		nodeURL,
 		chainID,
 		adjudicator,
-		assetHolder,
+		asset,
 	)
 	if err != nil {
 		panic(err)

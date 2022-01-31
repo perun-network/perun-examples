@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -42,11 +41,10 @@ const (
 
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
-	perunClient *client.Client                 // The core Perun client.
-	account     wallet.Address                 // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset                  // The currency we expect to get paid in.
-	channels    map[channel.ID]*PaymentChannel // A registry to store the channels.
-	channelsMtx sync.RWMutex                   // A mutex to protect the channel registry from concurrent access.
+	perunClient *client.Client       // The core Perun client.
+	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset        // The currency we expect to get paid in.
+	channels    chan *PaymentChannel // Accepted payment channels.
 }
 
 // SetupPaymentClient creates a new payment client.
@@ -57,7 +55,7 @@ func SetupPaymentClient(
 	nodeURL string,
 	chainID uint64,
 	adjudicator common.Address,
-	assetHolder common.Address,
+	asset ethwallet.Address,
 ) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -70,14 +68,13 @@ func SetupPaymentClient(
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
-	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, assetHolder, adjudicator)
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(asset), adjudicator)
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
 	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
-	asset := *NewAsset(assetHolder)
 	dep := ethchannel.NewETHDepositor()
 	ethAcc := accounts.Account{Address: acc}
 	funder.RegisterAsset(asset, dep, ethAcc)
@@ -103,7 +100,7 @@ func SetupPaymentClient(
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
-		channels:    map[channel.ID]*PaymentChannel{},
+		channels:    make(chan *PaymentChannel, 1),
 	}
 	go perunClient.Handle(c, c)
 
@@ -111,15 +108,15 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer *PaymentClient, asset channel.Asset, amount uint64) PaymentChannel {
+func (c *PaymentClient) OpenChannel(peer *PaymentClient, amount uint64) PaymentChannel {
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
-	initAlloc := channel.NewAllocation(2, asset) //TODO:go-perun balances should be initialized to zero
-	initAlloc.SetAssetBalances(asset, []channel.Bal{
+	initAlloc := channel.NewAllocation(2, c.currency) //TODO:go-perun balances should be initialized to zero
+	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
 		new(big.Int).SetUint64(amount), // Our initial balance.
 		big.NewInt(0),                  // Peer's initial balance.
 	})
@@ -142,7 +139,27 @@ func (c *PaymentClient) OpenChannel(peer *PaymentClient, asset channel.Asset, am
 		panic(err)
 	}
 
-	return *newPaymentChannel(ch)
+	// Start the on-chain event watcher. It automatically handles disputes.
+	c.startWatching(ch)
+
+	return *newPaymentChannel(ch, c.currency)
+}
+
+// startWatching starts the dispute watcher for the specified channel.
+func (c *PaymentClient) startWatching(ch *client.Channel) {
+	go func() {
+		err := ch.Watch(c)
+		if err != nil {
+			// Panic because if the watcher is not running, we are no longer
+			// protected against registration of old states.
+			panic(fmt.Sprintf("Watcher returned with error: %v", err))
+		}
+	}()
+}
+
+// AcceptedChannel returns the next accepted channel.
+func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
+	return <-c.channels
 }
 
 // Shutdown gracefully shuts down the client.

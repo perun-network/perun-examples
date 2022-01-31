@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 
 	"perun.network/go-perun/channel"
@@ -68,20 +69,11 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		return
 	}
 
-	// Store channel.
-	c.channelsMtx.Lock()
-	c.channels[ch.ID()] = newPaymentChannel(ch)
-	c.channelsMtx.Unlock()
-
 	// Start the on-chain event watcher. It automatically handles disputes.
-	go func() {
-		err := ch.Watch(c)
-		if err != nil {
-			// Panic because if the watcher is not running, we are no longer
-			// protected against registration of old states.
-			panic(fmt.Sprintf("Watcher returned with error: %v", err))
-		}
-	}()
+	c.startWatching(ch)
+
+	// Store channel.
+	c.channels <- newPaymentChannel(ch, c.currency)
 }
 
 // HandleUpdate is the callback for incoming channel updates.
@@ -114,15 +106,5 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
 func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
-	switch e := e.(type) {
-	case *channel.ConcludedEvent:
-		c.channelsMtx.RLock()
-		ch := c.channels[e.ID()]
-		c.channelsMtx.RUnlock()
-
-		err := ch.ch.Settle(context.TODO(), false)
-		if err != nil {
-			panic(err)
-		}
-	}
+	log.Printf("Adjudicator event: type = %T, client = %v", e, c.account)
 }

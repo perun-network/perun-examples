@@ -16,7 +16,11 @@ package main
 
 import (
 	"log"
+	"math/big"
+
+	"perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
+	"perun.network/perun-examples/app-channel/app"
 	"perun.network/perun-examples/app-channel/client"
 )
 
@@ -30,7 +34,7 @@ const (
 	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
-//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code in simple, but in production code one should always use proper context and handle error appropriately.
+//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code simple, but in production code one should always use proper context and handle error appropriately.
 
 // main runs a demo of the game client. It assumes that a blockchain node is
 // available at `chainURL` and that the accounts corresponding to the specified
@@ -38,14 +42,16 @@ const (
 func main() {
 	// Deploy contracts.
 	log.Println("Deploying contracts.")
-	adjudicator, assetHolder, tikTakToeApp := deployContracts(chainURL, chainID, keyDeployer)
+	adjudicator, assetHolder, appAddress := deployContracts(chainURL, chainID, keyDeployer)
 	asset := client.NewAsset(assetHolder)
+	app := app.NewTicTacToeApp(wallet.AsWalletAddr(appAddress))
 
 	// Setup clients.
 	log.Println("Setting up clients.")
 	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial Extension that explains tcp/ip bus.
-	alice := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyAlice)
-	bob := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyBob)
+	stake := big.NewInt(10)
+	alice := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyAlice, app, stake)
+	bob := setupGameClient(bus, chainURL, adjudicator, assetHolder, keyBob, app, stake)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
@@ -53,54 +59,59 @@ func main() {
 
 	// Open app channel, play, close.
 	log.Println("Opening channel.")
-	_alice, chID := alice.ProposeApp(bob, asset, tikTakToeApp, 10)
+	appAlice := alice.ProposeAppChannel(bob, asset)
+	appBob := bob.AcceptedGame()
 
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
 	// Alice set (2, 0)
-	_alice.Set(2, 0)
+	appAlice.Set(2, 0)
 
-	_bob := bob.GetApp(chID) //TODO:question I am not satisfied with this solution. + If called before _alice.Set(2, 0) it might fetch an empty game (because handler has not triggered yet)
-	//TODO:question The original implementation solved this by actively accepting the app proposal
 	log.Println("Bob's turn.")
 	// Bob set (0, 0)
-	_bob.Set(0, 0)
+	appBob.Set(0, 0)
 
 	log.Println("Alice's turn.") //TODO:question Can we make the turn's appear "less instant" in the console output
+	//TODO:answer You can insert time.sleep(...), but this will just slow down
+	//the updates without additional user feedback. Another alternative would be
+	//to let the user interactively enter the actions via stdin.
+
 	// Alice set (0, 2)
-	_alice.Set(0, 2)
+	appAlice.Set(0, 2)
 
 	log.Println("Bob's turn.")
 	// Bob set (1, 1)
-	_bob.Set(1, 1)
+	appBob.Set(1, 1)
 
 	log.Println("Alice's turn.")
 	// Alice set (2, 2)
-	_alice.Set(2, 2)
+	appAlice.Set(2, 2)
 
 	log.Println("Bob's turn.")
 	// Bob set (2, 1)
-	_bob.Set(2, 1)
+	appBob.Set(2, 1)
 
 	log.Println("Alice's turn.")
 	// Alice set (1, 2)
-	_alice.Set(1, 0)
+	appAlice.Set(1, 0)
 
 	log.Println("Bob's turn.")
 	// Bob set (2, 1)
-	_bob.Set(0, 1)
+	appBob.Set(0, 1)
 
-	log.Println("Bob's wins.")
-	log.Println("Closing channel.")
+	log.Println("Bob wins.")
+	log.Println("Payout.")
 
-	// Bob concludes
-	_bob.Settle()
+	//TODO Include dispute? Or separate tutorial?
+
+	// Payout.
+	appAlice.Settle()
+	appBob.Settle()
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)
 
-	// Shutdown.
-	log.Println("Shutting down.")
+	// Cleanup.
 	alice.Shutdown()
 	bob.Shutdown()
 }

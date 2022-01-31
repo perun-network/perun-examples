@@ -17,8 +17,8 @@ package main
 import (
 	"log"
 
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-examples/payment-channel/client"
 )
 
 const (
@@ -40,13 +40,13 @@ func main() {
 	// Deploy contracts.
 	log.Println("Deploying contracts.")
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
-	asset := client.NewAsset(assetHolder)
+	asset := ethwallet.AsWalletAddr(assetHolder)
 
 	// Setup clients.
 	log.Println("Setting up clients.")
 	bus := wire.NewLocalBus() // Message bus used for off-chain communication.	//TODO:tutorial Extension that explains tcp/ip bus.
-	alice := setupPaymentClient(bus, chainURL, adjudicator, assetHolder, keyAlice)
-	bob := setupPaymentClient(bus, chainURL, adjudicator, assetHolder, keyBob)
+	alice := setupPaymentClient(bus, chainURL, adjudicator, *asset, keyAlice)
+	bob := setupPaymentClient(bus, chainURL, adjudicator, *asset, keyBob)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
@@ -54,21 +54,22 @@ func main() {
 
 	// Open channel, transact, close.
 	log.Println("Opening channel.")
-	ch := alice.OpenChannel(bob, asset, 10)
+	chAlice := alice.OpenChannel(bob, 10)
+	chBob := bob.AcceptedChannel()
 
 	log.Println("Sending payments.")
-	ch.SendPayment(asset, 3)
-	ch.SendPayment(asset, 2)
-	ch.SendPayment(asset, 1)
+	chAlice.SendPayment(1)
+	chBob.SendPayment(2)
+	chAlice.SendPayment(3)
 
 	log.Println("Settling channel.")
-	ch.Settle()
+	chAlice.Settle() // Conclude and withdraw.
+	chBob.Settle()   // Withdraw.
 
 	// Print balances after transactions.
 	l.LogBalances(alice, bob)
 
-	// Shutdown.
-	log.Println("Shutting down.")
+	// Cleanup.
 	alice.Shutdown()
 	bob.Shutdown()
 }

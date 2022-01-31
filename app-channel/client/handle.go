@@ -18,8 +18,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/big"
-	"perun.network/perun-examples/app-channel/app"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -34,9 +32,8 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
 		}
 
-		// Ensure the ledger channel proposal includes the expected app
-		_, ok = lcp.App.(*app.TicTacToeApp) // TODO:question - is the check sufficient this way?
-		if !ok {
+		// Ensure the ledger channel proposal includes the expected app.
+		if !lcp.App.Def().Equals(c.app.Def()) {
 			return nil, fmt.Errorf("Invalid app type ")
 		}
 
@@ -52,12 +49,10 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 		}
 
 		// Check that we fund the expected amount.
-		expectedBal := big.NewInt(10)
-		for _, bals := range lcp.FundingAgreement {
-			bal := bals[receiverIdx]
-			if bal.Cmp(expectedBal) != 0 {
-				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
-			}
+		assetIndex := 0
+		bal := lcp.FundingAgreement[assetIndex][receiverIdx]
+		if bal.Cmp(c.stake) != 0 {
+			return nil, fmt.Errorf("Invalid funding balance: %v", bal)
 		}
 
 		return lcp, nil
@@ -77,70 +72,23 @@ func (c *AppClient) HandleProposal(p client.ChannelProposal, r *client.ProposalR
 		return
 	}
 
-	// Store channel.
-	c.appsMtx.Lock()
-	c.apps[ch.ID()] = newGame(ch)
-	c.appsMtx.Unlock()
-
-	log.Println("Channel proposal accepted.")
 	// Start the on-chain event watcher. It automatically handles disputes.
-	go func() {
-		err := ch.Watch(c)
-		if err != nil {
-			// Panic because if the watcher is not running, we are no longer
-			// protected against registration of old states.
-			panic(fmt.Sprintf("Watcher returned with error: %v", err))
-		}
-	}()
+	c.startWatching(ch)
+
+	c.games <- newGame(ch)
 }
 
 // HandleUpdate is the callback for incoming channel updates.
 func (c *AppClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
-	// We accept every update that is a valid transition of the game/app.
-	err := func() error {
-		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
-		if err != nil {
-			return err
-		}
-
-		g, ok := c.apps[next.State.ID]
-		if !ok {
-			return fmt.Errorf("Unknown channel ")
-		}
-
-		_app, ok := g.ch.Params().App.(*app.TicTacToeApp)
-		if !ok {
-			return fmt.Errorf("Invalid app ")
-		}
-
-		err = _app.ValidTransition(g.ch.Params(), g.state, next.State, next.ActorIdx) //TODO:question - Is a deep copy of state (clone()) necessary here? Does this have a performance impact?
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
-	if err != nil {
-		r.Reject(context.TODO(), err.Error()) //nolint:errcheck // It's OK if rejection fails.
-	}
-
-	// Send the acceptance message.
-	err = r.Accept(context.TODO())
+	// Perun automatically checks that the transition is valid.
+	// We always accept.
+	err := r.Accept(context.TODO())
 	if err != nil {
 		panic(err)
 	}
 }
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
-func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
-	switch e := e.(type) {
-	case *channel.ConcludedEvent:
-		c.appsMtx.RLock()
-		ch := c.apps[e.ID()]
-		c.appsMtx.RUnlock()
-
-		err := ch.ch.Settle(context.TODO(), false)
-		if err != nil {
-			panic(err)
-		}
-	}
+func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
+	log.Println("Channel concluded", c.account)
 }
