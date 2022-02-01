@@ -28,7 +28,9 @@ func (c PaymentChannel) SendPayment(amount uint64) {
 	// Use UpdateBy to update the channel state.
 	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { // We use context.TODO to keep the code simple.
 		ethAmount := new(big.Int).SetUint64(amount)
-		state.Allocation.TransferBalance(proposerIdx, receiverIdx, c.currency, ethAmount)
+		actor := c.ch.Idx()
+		peer := 1 - actor
+		state.Allocation.TransferBalance(actor, peer, c.currency, ethAmount)
 		return nil
 	})
 	if err != nil {

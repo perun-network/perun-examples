@@ -86,8 +86,9 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 		}
 
 		//TODO:go-perun bug, machine.go: `validTransition` checks whether balances per asset index are preserved, but does not check whether assets are the same.
-		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
-		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
+		clientIdx := 1 - next.ActorIdx
+		curBal := cur.Allocation.Balance(clientIdx, c.currency)
+		nextBal := next.State.Allocation.Balance(clientIdx, c.currency)
 		if nextBal.Cmp(curBal) < 0 {
 			return fmt.Errorf("Invalid balance: %v", nextBal)
 		}

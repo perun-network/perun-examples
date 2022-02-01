@@ -53,12 +53,12 @@ func main() {
 	l.LogBalances(alice, bob)
 
 	// Open channel, transact, close.
-	log.Println("Opening channel.")
+	log.Println("Opening channel and depositing funds.")
 	chAlice := alice.OpenChannel(bob, 10)
 	chBob := bob.AcceptedChannel()
 
 	log.Println("Sending payments.")
-	chAlice.SendPayment(1)
+	chAlice.SendPayment(5)
 	chBob.SendPayment(2)
 	chAlice.SendPayment(3)
 
