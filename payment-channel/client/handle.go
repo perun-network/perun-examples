@@ -47,7 +47,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		// Check that we do not need to fund anything.
 		zeroBal := big.NewInt(0)
 		for _, bals := range lcp.FundingAgreement {
-			bal := bals[receiverIdx]
+			bal := bals[1]
 			if bal.Cmp(zeroBal) != 0 {
 				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
 			}

@@ -35,8 +35,6 @@ import (
 
 const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
-	proposerIdx     = 0 // Participant index of the proposer.
-	receiverIdx     = 1 // Participant index of the receiver.
 )
 
 // PaymentClient is a payment channel client.
