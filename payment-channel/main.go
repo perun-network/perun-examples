@@ -31,8 +31,6 @@ const (
 	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
 )
 
-//todo:tutorial Mention that we use context.TODO and panic(err) to keep the code in simple, but in production code one should always use proper context and handle error appropriately.
-
 // main runs a demo of the payment client. It assumes that a blockchain node is
 // available at `chainURL` and that the accounts corresponding to the specified
 // secret keys are provided with sufficient funds.

@@ -80,12 +80,11 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
 	// We accept every update that increases our balance.
 	err := func() error {
-		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets) //TODO:go-perun move assets to parameters to disallow changing the assets until there is a use case for that?
+		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets)
 		if err != nil {
 			return fmt.Errorf("Invalid assets: %v", err)
 		}
 
-		//TODO:go-perun bug, machine.go: `validTransition` checks whether balances per asset index are preserved, but does not check whether assets are the same.
 		clientIdx := 1 - next.ActorIdx
 		curBal := cur.Allocation.Balance(clientIdx, c.currency)
 		nextBal := next.State.Allocation.Balance(clientIdx, c.currency)
@@ -106,6 +105,6 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 }
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
-func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) { //TODO:go-perun provide channel with event. expose channel registry?
+func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 	log.Printf("Adjudicator event: type = %T, client = %v", e, c.account)
 }

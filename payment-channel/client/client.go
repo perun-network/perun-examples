@@ -35,7 +35,7 @@ import (
 
 const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
-	proposerIdx     = 0 // Participant index of the proposer.  //TODO:go-perun expose channel.ProposerIdx and ReceiverIdx.
+	proposerIdx     = 0 // Participant index of the proposer.
 	receiverIdx     = 1 // Participant index of the receiver.
 )
 
@@ -115,7 +115,7 @@ func (c *PaymentClient) OpenChannel(peer *PaymentClient, amount uint64) PaymentC
 	participants := []wire.Address{c.account, peer.account}
 
 	// We create an initial allocation which defines the starting balances.
-	initAlloc := channel.NewAllocation(2, c.currency) //TODO:go-perun balances should be initialized to zero
+	initAlloc := channel.NewAllocation(2, c.currency)
 	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
 		new(big.Int).SetUint64(amount), // Our initial balance.
 		big.NewInt(0),                  // Peer's initial balance.

@@ -44,13 +44,13 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
 
 	// Deploy adjudicator.
-	adj, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc) //TODO:go-perun accept ethwallet Account instead?
+	adj, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc)
 	if err != nil {
 		panic(err)
 	}
 
 	// Deploy asset holder.
-	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc) //TODO:go-perun accept ethwallet Account instead?
+	ah, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, adj, acc)
 	if err != nil {
 		panic(err)
 	}

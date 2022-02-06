@@ -32,7 +32,7 @@ func CreateContractBackend(
 	w *swallet.Wallet,
 ) (ethchannel.ContractBackend, error) {
 	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
-	transactor := swallet.NewTransactor(w, signer) //TODO:go-perun transactor should be spawnable from Wallet: Add method "NewTransactor"
+	transactor := swallet.NewTransactor(w, signer)
 
 	ethClient, err := ethclient.Dial(nodeURL)
 	if err != nil {
