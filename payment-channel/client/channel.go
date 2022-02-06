@@ -23,11 +23,11 @@ func newPaymentChannel(ch *client.Channel, currency channel.Asset) *PaymentChann
 }
 
 // SendPayment sends a payment to the channel peer.
-func (c PaymentChannel) SendPayment(amount uint64) {
+func (c PaymentChannel) SendPayment(amount float64) {
 	// Transfer the given amount from us to peer.
 	// Use UpdateBy to update the channel state.
 	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { // We use context.TODO to keep the code simple.
-		ethAmount := new(big.Int).SetUint64(amount)
+		ethAmount := EthToWei(big.NewFloat(amount))
 		actor := c.ch.Idx()
 		peer := 1 - actor
 		state.Allocation.TransferBalance(actor, peer, c.currency, ethAmount)

@@ -108,8 +108,8 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer *PaymentClient, amount uint64) PaymentChannel {
-	// We define the channel participants. The proposer always has index 0. Here
+func (c *PaymentClient) OpenChannel(peer *PaymentClient, amount float64) PaymentChannel {
+	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 	participants := []wire.Address{c.account, peer.account}
@@ -117,7 +117,7 @@ func (c *PaymentClient) OpenChannel(peer *PaymentClient, amount uint64) PaymentC
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, c.currency)
 	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
-		new(big.Int).SetUint64(amount), // Our initial balance.
+		EthToWei(big.NewFloat(amount)), // Our initial balance.
 		big.NewInt(0),                  // Peer's initial balance.
 	})
 
