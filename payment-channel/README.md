@@ -1,4 +1,4 @@
-# app-channel
+# payment-channel
 
 Install [ganache-cli](https://github.com/trufflesuite/ganache-cli) and run
 ```sh

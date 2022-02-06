@@ -18,13 +18,11 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./perun-eth-contracts/contracts/App.sol";
-import "./perun-eth-contracts/contracts/Array.sol";
-import "./perun-eth-contracts/contracts/Channel.sol";
 
 /**
  * @notice TicTacToeApp is a channel app for playing tic tac toe.
  * The data is encoded as follows:
- * - data[0]: The index of the actor.
+ * - data[0]: The index of the next actor.
  * - data[i], i in [1,10]: The value of field i. 0 means no tick, 1 means tick by player 1, 2 means tick by player 2.
  */
 contract TicTacToeApp is App {
@@ -42,7 +40,7 @@ contract TicTacToeApp is App {
      * @notice ValidTransition checks if there was a valid transition between two states.
      * @param params The parameters of the channel.
      * @param from The current state.
-     * @param to The potenrial next state.
+     * @param to The potential next state.
      * @param signerIdx Index of the participant who signed this transition.
      */
     function validTransition(
@@ -54,12 +52,10 @@ contract TicTacToeApp is App {
     {
         require(params.participants.length == numParts, "number of participants");
 
-        bytes memory appData = to.appData;
-        uint8 actorIndex = uint8(appData[actorDataIndex]);
-        uint8 prevActorIndex = uint8(from.appData[actorDataIndex]);
-        require(appData.length == appDataLength, "data length");
+        uint8 actorIndex = uint8(from.appData[actorDataIndex]);
+        require(to.appData.length == appDataLength, "data length");
         require(actorIndex == signerIdx, "actor not signer");
-        require((prevActorIndex + 1) % numParts == actorIndex, "wait turn");
+        require((actorIndex + 1) % numParts == uint8(to.appData[actorDataIndex]), "next actor");
 
         // Test valid action.
         bool changed = false;
@@ -73,12 +69,13 @@ contract TicTacToeApp is App {
         }
 
         // Test final state.
-        (bool isFinal, bool hasWinner, uint8 winner) = checkFinal(appData);
+        (bool isFinal, bool hasWinner, uint8 winner) = checkFinal(to.appData);
         require(to.isFinal == isFinal, "final flag");
         Array.requireEqualAddressArray(to.outcome.assets, from.outcome.assets);
         Channel.requireEqualSubAllocArray(to.outcome.locked, from.outcome.locked);
         uint256[][] memory expectedBalances = from.outcome.balances;
         if (hasWinner) {
+            require(winner==0, "has winner !=0");
             uint8 loser = 1 - winner;
             expectedBalances = new uint256[][](expectedBalances.length);
             for (uint i = 0; i < expectedBalances.length; i++) {
@@ -96,16 +93,19 @@ contract TicTacToeApp is App {
         // 6 7 8
 
         // Check winner.
-        uint8[3][8] memory v = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
-            [0, 4, 8], [2, 4, 6] // diagonals
+        uint8[3][8] memory winningRows = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // horizontal
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // vertical
+        [0, 4, 8], [2, 4, 6]             // diagonal
         ];
-        
-        for (uint i = 0; i < v.length; i++) {
-            (bool ok, uint8 idx) = samePlayer(d, v[i]);
+        for (uint i = 0; i < winningRows.length; i++) {
+            (bool ok, uint8 v) = sameValue(d, winningRows[i]);
             if (ok) {
-                return (true, true, idx);
+                if (v == firstPlayer) {
+                    return (true, true, 0);
+                } else if (v == secondPlayer) {
+                    return (true, true, 1);
+                }
             }
         }
 
@@ -118,21 +118,14 @@ contract TicTacToeApp is App {
         return (true, false, 0);
     }
 
-    function samePlayer(bytes memory d, uint8[3] memory gridIndices) internal pure returns (bool ok, uint8 idx) {
+    function sameValue(bytes memory d, uint8[3] memory gridIndices) internal pure returns (bool ok, uint8 v) {
         bytes1 first = d[gridDataIndex + gridIndices[0]];
-        if (uint8(first) == notSet) {
-            return (false, 0);
-        }
-        for (uint i = 0; i < gridIndices.length; i++) {
+        for (uint i = 1; i < gridIndices.length; i++) {
             if (d[gridDataIndex + gridIndices[i]] != first) {
                 return (false, 0);
             }
         }
-        uint8 playerIndex = firstPlayer;
-        if (uint8(first) == secondPlayer) {
-            playerIndex = 1;
-        }
-        return (true, playerIndex);
+        return (true, uint8(first));
     }
 
     function requireEqualUint256ArrayArray(

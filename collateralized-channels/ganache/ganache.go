@@ -15,8 +15,10 @@
 package ganache
 
 import (
+	"bufio"
 	"crypto/ecdsa"
 	"fmt"
+	"log"
 	"math/big"
 	"os/exec"
 	"strings"
@@ -37,7 +39,8 @@ type GanacheConfig struct {
 		PrivateKey string
 		BalanceEth uint
 	}
-	StartupTime time.Duration
+	StartupTime   time.Duration
+	PrintToStdOut bool
 }
 
 type Ganache struct {
@@ -63,7 +66,7 @@ func StartGanacheWithPrefundedAccounts(cfg GanacheConfig) (ganache *Ganache, err
 
 	// Build ganache command line arguments
 	var ganacheArgs []string
-	ganacheArgs = append(ganacheArgs, "ganache-cli", "--host", cfg.Host, "--port", fmt.Sprint(cfg.Port))
+	ganacheArgs = append(ganacheArgs, "--port", fmt.Sprint(cfg.Port))
 	for _, a := range accounts {
 		key := hexutil.Encode(crypto.FromECDSA(a.PrivateKey))
 		ganacheArgs = append(ganacheArgs, "--account", fmt.Sprintf("%v,%v", key, a.Amount))
@@ -77,6 +80,29 @@ func StartGanacheWithPrefundedAccounts(cfg GanacheConfig) (ganache *Ganache, err
 	cmdArgs = append(cmdArgs, ganacheCmdTokens[1:]...)
 	cmdArgs = append(cmdArgs, ganacheArgs...)
 	cmd := exec.Command(cmdName, cmdArgs...)
+
+	// Print ganache command and arguments for debugging.
+	fmt.Println("Ganache command and arguments:", cmdName, cmdArgs)
+
+	// Print ganache output while it is running in the background.
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if cfg.PrintToStdOut {
+		go func() {
+			rd := bufio.NewReader(stdout)
+			for {
+				str, err := rd.ReadString('\n')
+				if err != nil {
+					fmt.Printf("Reading ganache output: %v\n", err)
+					return
+				}
+				fmt.Print("Ganache output:", str)
+			}
+		}()
+	}
+
 	if err := cmd.Start(); err != nil {
 		return nil, errors.WithMessage(err, "starting ganache")
 	}

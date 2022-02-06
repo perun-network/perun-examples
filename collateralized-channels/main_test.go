@@ -57,7 +57,7 @@ func TestCollateralizedChannels(t *testing.T) {
 		Port:        8545,
 		BlockTime:   1 * time.Second,
 		Funding:     accountFunding,
-		StartupTime: 3 * time.Second,
+		StartupTime: 5 * time.Second,
 	}
 
 	// More test parameters

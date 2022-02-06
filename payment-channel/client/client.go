@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -26,7 +27,6 @@ import (
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-examples/app-channel/app"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,18 +37,16 @@ const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
 )
 
-// AppClient is a payment channel client.
-type AppClient struct {
-	perunClient *client.Client    // The core Perun client.
-	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
-	currency    channel.Asset     // The currency we expect to get paid in.
-	stake       channel.Bal       // The amount we put at stake.
-	app         *app.TicTacToeApp // The app definition.
-	channels    chan *AppChannel
+// PaymentClient is a payment channel client.
+type PaymentClient struct {
+	perunClient *client.Client       // The core Perun client.
+	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset        // The currency we expect to get paid in.
+	channels    chan *PaymentChannel // Accepted payment channels.
 }
 
-// SetupAppClient creates a new payment client.
-func SetupAppClient(
+// SetupPaymentClient creates a new payment client.
+func SetupPaymentClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
 	acc common.Address, // acc is the address of the account to be used for signing transactions.
@@ -56,9 +54,7 @@ func SetupAppClient(
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
 	asset ethwallet.Address, // asset is the address of the asset holder for our payment channels.
-	app *app.TicTacToeApp, // app is the channel app we want to set up the client with.
-	stake channel.Bal, // stake is the balance the client is willing to fund the channel with.
-) (*AppClient, error) {
+) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
@@ -98,48 +94,44 @@ func SetupAppClient(
 	}
 
 	// Create client and start request handler.
-	c := &AppClient{
+	c := &PaymentClient{
 		perunClient: perunClient,
 		account:     waddr,
 		currency:    &asset,
-		stake:       stake,
-		app:         app,
-		channels:    make(chan *AppChannel, 1),
+		channels:    make(chan *PaymentChannel, 1),
 	}
 	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-// OpenAppChannel opens a new app channel with the specified peer.
-func (c *AppClient) OpenAppChannel(peer wire.Address) AppChannel {
+// OpenChannel opens a new channel with the specified peer and funding.
+func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) PaymentChannel {
+	// We define the channel participants. The proposer has always index 0. Here
+	// we use the on-chain addresses as off-chain addresses, but we could also
+	// use different ones.
 	participants := []wire.Address{c.account, peer}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, c.currency)
 	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
-		c.stake, // Our initial balance.
-		c.stake, // Peer's initial balance.
+		EthToWei(big.NewFloat(amount)), // Our initial balance.
+		big.NewInt(0),                  // Peer's initial balance.
 	})
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
-
-	firstActorIdx := channel.Index(0) // TODO: get idx via go-perun with 0.9.0
-	withApp := client.WithApp(c.app, c.app.InitData(firstActorIdx))
-
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
 		c.account,
 		initAlloc,
 		participants,
-		withApp,
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	// Send the app proposal
+	// Send the proposal.
 	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		panic(err)
@@ -148,11 +140,11 @@ func (c *AppClient) OpenAppChannel(peer wire.Address) AppChannel {
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
 
-	return *newAppChannel(ch)
+	return *newPaymentChannel(ch, c.currency)
 }
 
 // startWatching starts the dispute watcher for the specified channel.
-func (c *AppClient) startWatching(ch *client.Channel) {
+func (c *PaymentClient) startWatching(ch *client.Channel) {
 	go func() {
 		err := ch.Watch(c)
 		if err != nil {
@@ -161,12 +153,12 @@ func (c *AppClient) startWatching(ch *client.Channel) {
 	}()
 }
 
-// AcceptedChannel returns the next accepted app channel.
-func (c *AppClient) AcceptedChannel() *AppChannel {
+// AcceptedChannel returns the next accepted channel.
+func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
 	return <-c.channels
 }
 
 // Shutdown gracefully shuts down the client.
-func (c *AppClient) Shutdown() {
+func (c *PaymentClient) Shutdown() {
 	c.perunClient.Close()
 }

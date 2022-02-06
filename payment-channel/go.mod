@@ -1,4 +1,4 @@
-module perun.network/perun-examples/app-channel
+module perun.network/perun-examples/payment-channel
 
 go 1.17
 

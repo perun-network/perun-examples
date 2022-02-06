@@ -16,7 +16,6 @@ package client
 
 import (
 	"math/big"
-	"perun.network/go-perun/wire"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -24,6 +23,7 @@ import (
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	"perun.network/go-perun/wire"
 )
 
 // CreateContractBackend creates a new contract backend.
@@ -44,12 +44,12 @@ func CreateContractBackend(
 }
 
 // WalletAddress returns the wallet address of the client.
-func (c *AppClient) WalletAddress() common.Address {
+func (c *PaymentClient) WalletAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
 }
 
 // WireAddress returns the wire address of the client.
-func (c *AppClient) WireAddress() wire.Address {
+func (c *PaymentClient) WireAddress() wire.Address {
 	return c.account
 }
 
