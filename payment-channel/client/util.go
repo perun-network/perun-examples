@@ -47,7 +47,7 @@ func (c *PaymentClient) AccountAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
 }
 
-// EthToWei converts a given amount in ETH to Wei
+// EthToWei converts a given amount in ETH to Wei.
 func EthToWei(ethAmount *big.Float) (weiAmount *big.Int) {
 	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
 	weiPerEthFloat := new(big.Float).SetInt(weiPerEth)
@@ -56,7 +56,7 @@ func EthToWei(ethAmount *big.Float) (weiAmount *big.Int) {
 	return weiAmount
 }
 
-// WeiToEth converts a given amount in Wei to ETH
+// WeiToEth converts a given amount in Wei to ETH.
 func WeiToEth(weiAmount *big.Int) (ethAmount *big.Float) {
 	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
 	weiPerEthFloat := new(big.Float).SetInt(weiPerEth)

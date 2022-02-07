@@ -34,23 +34,16 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		}
 
 		// Check that we have the correct number of participants.
-		if lcp.NumPeers() != 2 { //TODO:go-perun rename NumPeers to NumParts, Peers to Participants anywhere where all parties are referred to
+		if lcp.NumPeers() != 2 {
 			return nil, fmt.Errorf("Invalid number of participants: %d", lcp.NumPeers())
 		}
 
-		// Check that the channel has the expected assets.
-		err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.currency})
-		if err != nil {
+		// Check that the channel has the expected assets and funding balances.
+		const assetIdx, peerIdx = 0, 1
+		if err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.currency}); err != nil {
 			return nil, fmt.Errorf("Invalid assets: %v\n", err)
-		}
-
-		// Check that we do not need to fund anything.
-		zeroBal := big.NewInt(0)
-		for _, bals := range lcp.FundingAgreement {
-			bal := bals[1]
-			if bal.Cmp(zeroBal) != 0 {
-				return nil, fmt.Errorf("Invalid funding balance: %v", bal)
-			}
+		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 {
+			return nil, fmt.Errorf("Invalid funding balance")
 		}
 		return lcp, nil
 	}()
@@ -85,9 +78,9 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 			return fmt.Errorf("Invalid assets: %v", err)
 		}
 
-		clientIdx := 1 - next.ActorIdx
-		curBal := cur.Allocation.Balance(clientIdx, c.currency)
-		nextBal := next.State.Allocation.Balance(clientIdx, c.currency)
+		receiverIdx := 1 - next.ActorIdx // This works because we are in a two-party channel.
+		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
+		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
 		if nextBal.Cmp(curBal) < 0 {
 			return fmt.Errorf("Invalid balance: %v", nextBal)
 		}
