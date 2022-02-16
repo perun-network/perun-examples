@@ -5,9 +5,11 @@ jobs:
   test-examples:
     name: Test Examples
     runs-on: ubuntu-latest
+    env:
+      gananache-image: trufflesuite/ganache-cli:v6.12.2
+
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
       - uses: actions/setup-go@v2
         with:
           go-version: 1.17
@@ -20,20 +22,19 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-
-      - name: Install Ganache-CLI
-        run: npm install ganache-cli
+      
+      - name: Pull ganache-cli image
+        run: docker pull ${{ env.gananache-image }}
 
       - name: Simple Client
         working-directory: simple-client
         env:
           MNEMONIC: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
         run: |
-          npx ganache-cli -b 5 -a 2 -m "$MNEMONIC" &
-          GANACHE_PID=$!
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.gananache-image }} -b 5 -a 2 -m "$MNEMONIC"
           sleep 5
           go run .
-          kill $GANACHE_PID
+          docker stop ganache
 
       - name: Payment Channel
         working-directory: payment-channel
@@ -43,20 +44,23 @@ jobs:
           KEY_BOB: '0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e'
           BALANCE: '10000000000000000000'
         run: |
-          npx ganache-cli --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5 --gasPrice=0 &
-          GANACHE_PID=$!
-          sleep 3
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.gananache-image }} --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5 --gasPrice=0
+          sleep 5
           go run .
-          kill $GANACHE_PID
+          docker stop ganache
 
       - name: Collateralized Channels
         working-directory: collateralized-channels
         env:
-          GANACHE_CMD: npx ganache-cli
-        run: go test -v -timeout 60s .
+          GANACHE_CMD: "docker run --name ganache --rm --publish 8545:8545 ${{ env.gananache-image }}"
+        run: |
+          go test -v -timeout 60s .
+          docker stop ganache
 
       - name: App Channel
         working-directory: app-channel
         env:
-          GANACHE_CMD: npx ganache-cli
-        run: go test -v -timeout 60s .
+          GANACHE_CMD: "docker run --name ganache --rm --publish 8545:8545 ${{ env.gananache-image }}"
+        run: |
+          go test -v -timeout 60s .
+          docker stop ganache
