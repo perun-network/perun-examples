@@ -16,6 +16,7 @@ package main
 
 import (
 	"log"
+
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
 )
@@ -37,13 +38,13 @@ func main() {
 	// Deploy contracts.
 	log.Println("Deploying contracts.")
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
-	asset := ethwallet.AsWalletAddr(assetHolder)
+	asset := *ethwallet.AsWalletAddr(assetHolder)
 
 	// Setup clients.
 	log.Println("Setting up clients.")
 	bus := wire.NewLocalBus() // Message bus used for off-chain communication.
-	alice := setupPaymentClient(bus, chainURL, adjudicator, *asset, keyAlice)
-	bob := setupPaymentClient(bus, chainURL, adjudicator, *asset, keyBob)
+	alice := setupPaymentClient(bus, chainURL, adjudicator, asset, keyAlice)
+	bob := setupPaymentClient(bus, chainURL, adjudicator, asset, keyBob)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
@@ -51,7 +52,7 @@ func main() {
 
 	// Open channel, transact, close.
 	log.Println("Opening channel and depositing funds.")
-	chAlice := alice.OpenChannel(bob, 5)
+	chAlice := alice.OpenChannel(bob.WireAddress(), 5)
 	chBob := bob.AcceptedChannel()
 
 	log.Println("Sending payments...")

@@ -23,6 +23,7 @@ import (
 	ethchannel "perun.network/go-perun/backend/ethereum/channel"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	"perun.network/go-perun/wire"
 )
 
 // CreateContractBackend creates a new contract backend.
@@ -42,9 +43,14 @@ func CreateContractBackend(
 	return ethchannel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-// AccountAddress returns the account address of the client.
-func (c *PaymentClient) AccountAddress() common.Address {
+// WalletAddress returns the wallet address of the client.
+func (c *PaymentClient) WalletAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
+}
+
+// WireAddress returns the wire address of the client.
+func (c *PaymentClient) WireAddress() wire.Address {
+	return c.account
 }
 
 // EthToWei converts a given amount in ETH to Wei.

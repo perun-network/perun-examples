@@ -109,7 +109,7 @@ func newBalanceLogger(chainURL string) balanceLogger {
 func (l balanceLogger) LogBalances(clients ...*client.PaymentClient) {
 	bals := make([]*big.Float, len(clients))
 	for i, c := range clients {
-		bal, err := l.ethClient.BalanceAt(context.TODO(), c.AccountAddress(), nil)
+		bal, err := l.ethClient.BalanceAt(context.TODO(), c.WalletAddress(), nil)
 		if err != nil {
 			log.Fatal(err)
 		}
