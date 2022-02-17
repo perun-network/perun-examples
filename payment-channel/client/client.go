@@ -148,9 +148,7 @@ func (c *PaymentClient) startWatching(ch *client.Channel) {
 	go func() {
 		err := ch.Watch(c)
 		if err != nil {
-			// Panic because if the watcher is not running, we are no longer
-			// protected against registration of old states.
-			panic(fmt.Sprintf("Watcher returned with error: %v", err))
+			fmt.Printf("Watcher returned with error: %v", err)
 		}
 	}()
 }
