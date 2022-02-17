@@ -48,8 +48,8 @@ type PaymentClient struct {
 // SetupPaymentClient creates a new payment client.
 func SetupPaymentClient(
 	bus wire.Bus, // bus is used of off-chain communication.
-	w *swallet.Wallet, // w is the wallet that will be used by the client for signing transactions.
-	acc common.Address, // acc is the address of the account that will be used by the client for signing transactions.
+	w *swallet.Wallet, // w is the wallet used for signing transactions.
+	acc common.Address, // acc is the address of the account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
