@@ -47,13 +47,13 @@ type PaymentClient struct {
 
 // SetupPaymentClient creates a new payment client.
 func SetupPaymentClient(
-	bus wire.Bus,
-	w *swallet.Wallet,
-	acc common.Address,
-	nodeURL string,
-	chainID uint64,
-	adjudicator common.Address,
-	asset ethwallet.Address,
+	bus wire.Bus, // bus is used of off-chain communication.
+	w *swallet.Wallet, // w is the wallet that will be used by the client for signing transactions.
+	acc common.Address, // acc is the address of the account that will be used by the client for signing transactions.
+	nodeURL string, // nodeURL is the URL of the blockchain node.
+	chainID uint64, // chainID is the identifier of the blockchain.
+	adjudicator common.Address, // adjudicator is the address of the adjudicator.
+	asset ethwallet.Address, // asset is the address of the asset holder for our payment channels.
 ) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
