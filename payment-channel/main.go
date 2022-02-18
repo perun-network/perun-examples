@@ -48,7 +48,7 @@ func main() {
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)
-	l.LogBalances(alice, bob)
+	l.LogBalances(alice.WalletAddress(), bob.WalletAddress())
 
 	// Open channel, transact, close.
 	log.Println("Opening channel and depositing funds.")
@@ -65,7 +65,7 @@ func main() {
 	chBob.Settle()   // Withdraw.
 
 	// Print balances after transactions.
-	l.LogBalances(alice, bob)
+	l.LogBalances(alice.WalletAddress(), bob.WalletAddress())
 
 	// Cleanup.
 	alice.Shutdown()

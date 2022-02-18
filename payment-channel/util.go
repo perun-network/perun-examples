@@ -105,11 +105,11 @@ func newBalanceLogger(chainURL string) balanceLogger {
 	return balanceLogger{ethClient: c}
 }
 
-// LogBalances prints the balances of the specified clients.
-func (l balanceLogger) LogBalances(clients ...*client.PaymentClient) {
-	bals := make([]*big.Float, len(clients))
-	for i, c := range clients {
-		bal, err := l.ethClient.BalanceAt(context.TODO(), c.WalletAddress(), nil)
+// LogBalances prints the balances of the specified accounts.
+func (l balanceLogger) LogBalances(accounts ...common.Address) {
+	bals := make([]*big.Float, len(accounts))
+	for i, c := range accounts {
+		bal, err := l.ethClient.BalanceAt(context.TODO(), c, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
