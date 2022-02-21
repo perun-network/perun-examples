@@ -227,7 +227,7 @@ func createGanacheConfig() ganache.GanacheConfig {
 		Port:        8545,
 		BlockTime:   blockTimeInSeconds,
 		Funding:     accountFunding,
-		StartupTime: 3 * time.Second,
+		StartupTime: 10 * time.Second,
 		ChainID:     big.NewInt(1337),
 	}
 }
