@@ -1,0 +1,44 @@
+package client
+
+import (
+	"context"
+	"fmt"
+
+	"perun.network/go-perun/channel"
+	"perun.network/go-perun/client"
+	"perun.network/perun-examples/app-channel/app"
+)
+
+type AppChannel struct {
+	ch *client.Channel
+}
+
+func newAppChannel(ch *client.Channel) *AppChannel {
+	return &AppChannel{ch: ch}
+}
+
+func (g *AppChannel) Set(x, y int) {
+	err := g.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
+		app, ok := state.App.(*app.TicTacToeApp)
+		if !ok {
+			return fmt.Errorf("invalid app type: %T", app)
+		}
+
+		return app.Set(state, x, y, g.ch.Idx())
+	})
+	if err != nil {
+		panic(err) // We panic on error to keep the code simple.
+	}
+}
+
+func (g *AppChannel) Settle() {
+	// Channel should be finalized through last ("winning") move.
+	// No need to set `isFinal` here.
+	err := g.ch.Settle(context.TODO(), false)
+	if err != nil {
+		panic(err)
+	}
+
+	// Cleanup.
+	g.ch.Close()
+}

@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,130 +15,158 @@
 package client
 
 import (
+	"context"
 	"fmt"
-	"math/big"
-	"sync"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
-	"perun.network/go-perun/backend/ethereum/bindings/assetholdereth"
-	ewallet "perun.network/go-perun/backend/ethereum/wallet"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/app"
-	"perun.network/perun-examples/app-channel/perun"
+
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 )
 
-type ClientConfig struct {
-	perun.ClientConfig
-	ChallengeDuration time.Duration
-	AppAddress        common.Address
-	ContextTimeout    time.Duration
+const (
+	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
+)
+
+// AppClient is a payment channel client.
+type AppClient struct {
+	perunClient *client.Client    // The core Perun client.
+	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
+	currency    channel.Asset     // The currency we expect to get paid in.
+	stake       channel.Bal       // The amount we put at stake.
+	app         *app.TicTacToeApp // The app definition.
+	channels    chan *AppChannel
 }
 
-type PaymentAcceptancePolicy = func(
-	amount *big.Int,
-	collateral *big.Int,
-	funding *big.Int,
-	balance *big.Int,
-	hasOverdrawn bool,
-) (ok bool)
-
-type Client struct {
-	sync.Mutex
-	perunClient       *perun.Client
-	assetHolderAddr   common.Address
-	assetHolder       *assetholdereth.AssetHolderETH
-	games             map[channel.ID]*Game
-	challengeDuration time.Duration
-	appAddress        common.Address
-	contextTimeout    time.Duration
-	gameProposals     chan *GameProposal
-}
-
-func StartClient(cfg ClientConfig) (*Client, error) {
-	perunClient, err := perun.SetupClient(cfg.ClientConfig)
+// SetupAppClient creates a new payment client.
+func SetupAppClient(
+	bus wire.Bus, // bus is used of off-chain communication.
+	w *swallet.Wallet, // w is the wallet used for signing transactions.
+	acc common.Address, // acc is the address of the account to be used for signing transactions.
+	nodeURL string, // nodeURL is the URL of the blockchain node.
+	chainID uint64, // chainID is the identifier of the blockchain.
+	adjudicator common.Address, // adjudicator is the address of the adjudicator.
+	asset ethwallet.Address, // asset is the address of the asset holder for our payment channels.
+	app *app.TicTacToeApp, // app is the channel app we want to set up the client with.
+	stake channel.Bal, // stake is the balance the client is willing to fund the channel with.
+) (*AppClient, error) {
+	// Create Ethereum client and contract backend.
+	cb, err := CreateContractBackend(nodeURL, chainID, w)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating perun client")
+		return nil, fmt.Errorf("creating contract backend: %w", err)
 	}
 
-	ah, err := assetholdereth.NewAssetHolderETH(cfg.AssetHolderAddr, perunClient.ContractBackend)
+	// Validate contracts.
+	err = ethchannel.ValidateAdjudicator(context.TODO(), cb, adjudicator)
 	if err != nil {
-		return nil, errors.WithMessage(err, "loading asset holder")
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
+	}
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(asset), adjudicator)
+	if err != nil {
+		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
 
-	c := &Client{
-		sync.Mutex{},
-		perunClient,
-		cfg.AssetHolderAddr,
-		ah,
-		make(map[channel.ID]*Game),
-		cfg.ChallengeDuration,
-		cfg.AppAddress,
-		cfg.ContextTimeout,
-		make(chan *GameProposal, 1),
+	// Setup funder.
+	funder := ethchannel.NewFunder(cb)
+	dep := ethchannel.NewETHDepositor()
+	ethAcc := accounts.Account{Address: acc}
+	funder.RegisterAsset(asset, dep, ethAcc)
+
+	// Setup adjudicator.
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+
+	// Setup dispute watcher.
+	watcher, err := local.NewWatcher(adj)
+	if err != nil {
+		return nil, fmt.Errorf("intializing watcher: %w", err)
 	}
 
-	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(cfg.AppAddress))
-	channel.RegisterApp(_app)
+	// Setup Perun client.
+	waddr := ethwallet.AsWalletAddr(acc)
+	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	if err != nil {
+		return nil, errors.WithMessage(err, "creating client")
+	}
 
-	go c.perunClient.PerunClient.Handle(c, c)
-	go c.perunClient.Bus.Listen(c.perunClient.Listener)
+	// Create client and start request handler.
+	c := &AppClient{
+		perunClient: perunClient,
+		account:     waddr,
+		currency:    &asset,
+		stake:       stake,
+		app:         app,
+		channels:    make(chan *AppChannel, 1),
+	}
+	go perunClient.Handle(c, c)
 
 	return c, nil
 }
 
-func (c *Client) ProposeGame(opponent common.Address, stake *big.Int) (*Game, error) {
-	c.Lock()
-	defer c.Unlock()
+// OpenAppChannel opens a new app channel with the specified peer.
+func (c *AppClient) OpenAppChannel(peer wire.Address) AppChannel {
+	participants := []wire.Address{c.account, peer}
 
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-	_app := app.NewTicTacToeApp(ewallet.AsWalletAddr(c.appAddress))
-	peers := []wire.Address{c.perunClient.Account.Address(), ewallet.AsWalletAddr(opponent)}
-	withApp := client.WithApp(_app, _app.InitData(0))
+	// We create an initial allocation which defines the starting balances.
+	initAlloc := channel.NewAllocation(2, c.currency)
+	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
+		c.stake, // Our initial balance.
+		c.stake, // Peer's initial balance.
+	})
 
-	prop, err := client.NewLedgerChannelProposal(
-		c.challengeDurationInSeconds(),
-		c.PerunAddress(),
-		makeStakeAllocation(c.assetHolderAddr, stake),
-		peers,
+	// Prepare the channel proposal by defining the channel parameters.
+	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
+
+	firstActorIdx := channel.Index(0)
+	withApp := client.WithApp(c.app, c.app.InitData(firstActorIdx))
+
+	proposal, err := client.NewLedgerChannelProposal(
+		challengeDuration,
+		c.account,
+		initAlloc,
+		participants,
 		withApp,
 	)
 	if err != nil {
-		return nil, errors.WithMessage(err, "creating channel proposal")
+		panic(err)
 	}
 
-	perunChannel, err := c.perunClient.PerunClient.ProposeChannel(ctx, prop)
+	// Send the app proposal
+	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
-		return nil, errors.WithMessage(err, "proposing channel")
+		panic(err)
 	}
-	g := c.newGame(perunChannel)
-	return g, nil
+
+	// Start the on-chain event watcher. It automatically handles disputes.
+	c.startWatching(ch)
+
+	return *newAppChannel(ch)
 }
 
-func (c *Client) NextGameProposal() (*GameProposal, error) {
-	p, ok := <-c.gameProposals
-	if !ok {
-		return nil, fmt.Errorf("channel closed")
-	}
-	return p, nil
-}
-
-func (c *Client) newGame(perunChannel *client.Channel) *Game {
-	g := &Game{
-		sync.Mutex{},
-		c,
-		perunChannel,
-		perunChannel.State().Clone(),
-		make(chan error, 1),
-	}
-	c.games[perunChannel.ID()] = g
-	// Start the on-chain watcher.
+// startWatching starts the dispute watcher for the specified channel.
+func (c *AppClient) startWatching(ch *client.Channel) {
 	go func() {
-		g.errs <- g.ch.Watch(c)
+		err := ch.Watch(c)
+		if err != nil {
+			fmt.Printf("Watcher returned with error: %v", err)
+		}
 	}()
-	return g
+}
+
+// AcceptedChannel returns the next accepted app channel.
+func (c *AppClient) AcceptedChannel() *AppChannel {
+	return <-c.channels
+}
+
+// Shutdown gracefully shuts down the client.
+func (c *AppClient) Shutdown() {
+	c.perunClient.Close()
 }
