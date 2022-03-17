@@ -16,9 +16,10 @@ package main
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"log"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 
 	"perun.network/perun-examples/app-channel/app"
@@ -71,6 +72,9 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 	}
 
 	_, err = bind.WaitDeployed(context.TODO(), cb, tx)
+	if err != nil {
+		panic(err)
+	}
 
 	return adj, ah, app
 }
