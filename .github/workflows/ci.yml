@@ -68,4 +68,4 @@ jobs:
           GANACHE_CMD: "docker run --name ganache --rm --publish 8545:8545 ${{ env.gananache-image }}"
         run: |
           go test -v -timeout 60s .
-          docker stop ganache
+          docker stop ganache || true # Cleanup
