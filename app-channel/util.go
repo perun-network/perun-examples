@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"log"
 	"math/big"
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -59,15 +60,17 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 		panic(err)
 	}
 
-	tops, err := cb.NewTransactor(context.TODO(), ethchannel.GasLimit, acc)
+	tops, err := cb.NewTransactor(context.TODO(), 6721975, acc)
 	if err != nil {
 		panic(err)
 	}
 	// Deploy TicTacToe App.
-	app, _, _, err = ticTacToeApp.DeployTicTacToeApp(tops, cb)
+	app, tx, _, err := ticTacToeApp.DeployTicTacToeApp(tops, cb)
 	if err != nil {
 		panic(err)
 	}
+
+	_, err = bind.WaitDeployed(context.TODO(), cb, tx)
 
 	return adj, ah, app
 }
