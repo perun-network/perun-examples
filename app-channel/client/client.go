@@ -106,6 +106,8 @@ func SetupAppClient(
 		app:         app,
 		channels:    make(chan *AppChannel, 1),
 	}
+
+	channel.RegisterApp(app)
 	go perunClient.Handle(c, c)
 
 	return c, nil
