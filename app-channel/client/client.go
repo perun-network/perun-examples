@@ -114,7 +114,7 @@ func SetupAppClient(
 }
 
 // OpenAppChannel opens a new app channel with the specified peer.
-func (c *AppClient) OpenAppChannel(peer wire.Address) AppChannel {
+func (c *AppClient) OpenAppChannel(peer wire.Address) *AppChannel {
 	participants := []wire.Address{c.account, peer}
 
 	// We create an initial allocation which defines the starting balances.
@@ -150,7 +150,7 @@ func (c *AppClient) OpenAppChannel(peer wire.Address) AppChannel {
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
 
-	return *newAppChannel(ch)
+	return newAppChannel(ch)
 }
 
 // startWatching starts the dispute watcher for the specified channel.
