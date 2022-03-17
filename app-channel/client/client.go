@@ -141,7 +141,7 @@ func (c *AppClient) OpenAppChannel(peer wire.Address) AppChannel {
 		panic(err)
 	}
 
-	// Send the app proposal
+	// Send the app channel proposal.
 	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		panic(err)
