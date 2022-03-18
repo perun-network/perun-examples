@@ -94,15 +94,10 @@ func main() {
 
 	log.Println("Alice's turn.")
 	// Alice set (1, 2)
-	appAlice.Set(1, 0)
+	appAlice.ForceSet(1, 2)
 	time.Sleep(time.Second)
 
-	log.Println("Bob's turn.")
-	// Bob set (2, 1)
-	appBob.Set(0, 1)
-	time.Sleep(time.Second)
-
-	log.Println("Bob wins.")
+	log.Println("Alice wins.")
 	log.Println("Payout.")
 
 	// Payout.
