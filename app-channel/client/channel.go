@@ -9,18 +9,18 @@ import (
 	"perun.network/perun-examples/app-channel/app"
 )
 
-// AppChannel is a wrapper for a Perun channel for the app use case.
-type AppChannel struct {
+// TicTacToeChannel is a wrapper for a Perun channel for the tic-tac-toe app use case.
+type TicTacToeChannel struct {
 	ch *client.Channel
 }
 
-// newAppChannel creates a new app channel.
-func newAppChannel(ch *client.Channel) *AppChannel {
-	return &AppChannel{ch: ch}
+// newTicTacToeChannel creates a new tic-tac-toe app channel.
+func newTicTacToeChannel(ch *client.Channel) *TicTacToeChannel {
+	return &TicTacToeChannel{ch: ch}
 }
 
 // Set sends a game move to the channel peer
-func (g *AppChannel) Set(x, y int) {
+func (g *TicTacToeChannel) Set(x, y int) {
 	err := g.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
 		app, ok := state.App.(*app.TicTacToeApp)
 		if !ok {
@@ -35,7 +35,7 @@ func (g *AppChannel) Set(x, y int) {
 }
 
 // ForceSet registers a game move on-chain
-func (g *AppChannel) ForceSet(x, y int) {
+func (g *TicTacToeChannel) ForceSet(x, y int) {
 	err := g.ch.ForceUpdate(context.TODO(), func(state *channel.State) {
 		err := func() error {
 			app, ok := state.App.(*app.TicTacToeApp)
@@ -55,7 +55,7 @@ func (g *AppChannel) ForceSet(x, y int) {
 }
 
 // Settle settles the app channel and withdraws the funds.
-func (g *AppChannel) Settle() {
+func (g *TicTacToeChannel) Settle() {
 	// Channel should be finalized through last ("winning") move.
 	// No need to set `isFinal` here.
 	err := g.ch.Settle(context.TODO(), false)
