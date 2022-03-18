@@ -9,14 +9,17 @@ import (
 	"perun.network/perun-examples/app-channel/app"
 )
 
+// AppChannel is a wrapper for a Perun channel for the app use case.
 type AppChannel struct {
 	ch *client.Channel
 }
 
+// newAppChannel creates a new app channel.
 func newAppChannel(ch *client.Channel) *AppChannel {
 	return &AppChannel{ch: ch}
 }
 
+// Set sends a game move to the channel peer
 func (g *AppChannel) Set(x, y int) {
 	err := g.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
 		app, ok := state.App.(*app.TicTacToeApp)
