@@ -10,10 +10,14 @@ import (
 )
 
 // TicTacToeAppData is the app data struct.
-type TicTacToeAppData struct { // Grid:
-	NextActor uint8         // 0 1 2
-	Grid      [9]FieldValue // 3 4 5
-} // 6 7 8
+// Grid:
+// 0 1 2
+// 3 4 5
+// 6 7 8
+type TicTacToeAppData struct {
+	NextActor uint8
+	Grid      [9]FieldValue
+}
 
 func (d *TicTacToeAppData) String() string {
 	var b bytes.Buffer
