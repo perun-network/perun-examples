@@ -34,6 +34,27 @@ func (g *AppChannel) Set(x, y int) {
 	}
 }
 
+// ForceSet registers a game move on-chain
+func (g *AppChannel) ForceSet(x, y int) {
+	err := g.ch.ForceUpdate(context.TODO(), func(state *channel.State) {
+		err := func() error {
+			app, ok := state.App.(*app.TicTacToeApp)
+			if !ok {
+				return fmt.Errorf("invalid app type: %T", app)
+			}
+
+			return app.Set(state, x, y, g.ch.Idx())
+		}()
+		if err != nil {
+			panic(err)
+		}
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Settle settles the app channel and withdraws the funds.
 func (g *AppChannel) Settle() {
 	// Channel should be finalized through last ("winning") move.
 	// No need to set `isFinal` here.
