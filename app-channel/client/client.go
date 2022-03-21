@@ -37,7 +37,7 @@ const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
 )
 
-// AppClient is a payment channel client.
+// AppClient is a app channel client.
 type AppClient struct {
 	perunClient *client.Client    // The core Perun client.
 	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
@@ -47,7 +47,7 @@ type AppClient struct {
 	channels    chan *TicTacToeChannel
 }
 
-// SetupAppClient creates a new payment client.
+// SetupAppClient creates a new app client.
 func SetupAppClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
@@ -55,7 +55,7 @@ func SetupAppClient(
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
-	asset ethwallet.Address, // asset is the address of the asset holder for our payment channels.
+	asset ethwallet.Address, // asset is the address of the asset holder for our app channels.
 	app *app.TicTacToeApp, // app is the channel app we want to set up the client with.
 	stake channel.Bal, // stake is the balance the client is willing to fund the channel with.
 ) (*AppClient, error) {
