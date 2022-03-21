@@ -61,6 +61,9 @@ func main() {
 	appAlice := alice.OpenAppChannel(bob.WireAddress())
 	appBob := bob.AcceptedChannel()
 
+	// Trigger if there is a dispute or not
+	disputeCase := false
+
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
 	// Alice set (2, 0)
@@ -92,9 +95,13 @@ func main() {
 	appBob.Set(2, 1)
 	time.Sleep(time.Second)
 
-	log.Println("Alice's turn.")
 	// Alice set (1, 2)
-	appAlice.ForceSet(1, 2)
+	log.Println("Alice's turn.")
+	if disputeCase {
+		appAlice.ForceSet(1, 2)
+	} else {
+		appAlice.Set(1, 2)
+	}
 	time.Sleep(time.Second)
 
 	log.Println("Alice wins.")
