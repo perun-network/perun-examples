@@ -17,12 +17,10 @@ package main
 import (
 	"log"
 	"math/big"
-	"perun.network/perun-examples/app-channel/client"
-	"time"
-
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/app"
+	"perun.network/perun-examples/app-channel/client"
 )
 
 const (
@@ -56,53 +54,33 @@ func main() {
 	l := newBalanceLogger(chainURL)
 	l.LogBalances(alice, bob)
 
-	// Open app channel, play, close.
+	// Open app channel and play
 	log.Println("Opening channel.")
 	appAlice := alice.OpenAppChannel(bob.WireAddress())
 	appBob := bob.AcceptedChannel()
 
-	// Trigger if there is a dispute or not
-	disputeCase := false
-
 	log.Println("Start playing.")
 	log.Println("Alice's turn.")
-	// Alice set (2, 0)
 	appAlice.Set(2, 0)
-	time.Sleep(time.Second)
 
 	log.Println("Bob's turn.")
-	// Bob set (0, 0)
 	appBob.Set(0, 0)
-	time.Sleep(time.Second)
 
 	log.Println("Alice's turn.")
-	// Alice set (0, 2)
 	appAlice.Set(0, 2)
-	time.Sleep(time.Second)
 
 	log.Println("Bob's turn.")
-	// Bob set (1, 1)
 	appBob.Set(1, 1)
-	time.Sleep(time.Second)
 
 	log.Println("Alice's turn.")
-	// Alice set (2, 2)
 	appAlice.Set(2, 2)
-	time.Sleep(time.Second)
 
 	log.Println("Bob's turn.")
-	// Bob set (2, 1)
 	appBob.Set(2, 1)
-	time.Sleep(time.Second)
 
-	// Alice set (1, 2)
+	// Dispute
 	log.Println("Alice's turn.")
-	if disputeCase {
-		appAlice.ForceSet(1, 2)
-	} else {
-		appAlice.Set(1, 2)
-	}
-	time.Sleep(time.Second)
+	appAlice.ForceSet(1, 2)
 
 	log.Println("Alice wins.")
 	log.Println("Payout.")
