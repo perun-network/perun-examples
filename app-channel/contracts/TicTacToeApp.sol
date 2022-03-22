@@ -75,13 +75,13 @@ contract TicTacToeApp is App {
         Channel.requireEqualSubAllocArray(to.outcome.locked, from.outcome.locked);
         uint256[][] memory expectedBalances = from.outcome.balances;
         if (hasWinner) {
-            uint8 winnerIndex = winner - 1;
-            uint8 loserIndex = 1 - winnerIndex;
+            require(winner==0, "has winner !=0");
+            uint8 loser = 1 - winner;
             expectedBalances = new uint256[][](expectedBalances.length);
             for (uint i = 0; i < expectedBalances.length; i++) {
                 expectedBalances[i] = new uint256[](numParts);
-                expectedBalances[i][winnerIndex] = from.outcome.balances[i][0] + from.outcome.balances[i][1];
-                expectedBalances[i][loserIndex] = 0;
+                expectedBalances[i][winner] = from.outcome.balances[i][0] + from.outcome.balances[i][1];
+                expectedBalances[i][loser] = 0;
             }
         }
         requireEqualUint256ArrayArray(to.outcome.balances, expectedBalances);
@@ -99,9 +99,13 @@ contract TicTacToeApp is App {
         [0, 4, 8], [2, 4, 6]             // diagonal
         ];
         for (uint i = 0; i < winningRows.length; i++) {
-            (bool ok, uint8 winner) = sameValue(d, winningRows[i]);
+            (bool ok, uint8 v) = sameValue(d, winningRows[i]);
             if (ok) {
-                return (true, true, winner);
+                if (v == firstPlayer) {
+                    return (true, true, 0);
+                } else if (v == secondPlayer) {
+                    return (true, true, 1);
+                }
             }
         }
 
@@ -114,7 +118,7 @@ contract TicTacToeApp is App {
         return (true, false, 0);
     }
 
-    function sameValue(bytes memory d, uint8[3] memory gridIndices) internal pure returns (bool ok, uint8 winner) {
+    function sameValue(bytes memory d, uint8[3] memory gridIndices) internal pure returns (bool ok, uint8 v) {
         bytes1 first = d[gridDataIndex + gridIndices[0]];
         for (uint i = 1; i < gridIndices.length; i++) {
             if (d[gridDataIndex + gridIndices[i]] != first) {
