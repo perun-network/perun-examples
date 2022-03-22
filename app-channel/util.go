@@ -61,7 +61,7 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 		panic(err)
 	}
 
-	tops, err := cb.NewTransactor(context.TODO(), 6721975, acc)
+	tops, err := cb.NewTransactor(context.TODO(), 1100000, acc) // gasLimit must be sufficient for TicTacToe.sol
 	if err != nil {
 		panic(err)
 	}
