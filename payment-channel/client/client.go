@@ -106,7 +106,7 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) PaymentChannel {
+func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentChannel {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
@@ -140,7 +140,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) PaymentCh
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
 
-	return *newPaymentChannel(ch, c.currency)
+	return newPaymentChannel(ch, c.currency)
 }
 
 // startWatching starts the dispute watcher for the specified channel.
