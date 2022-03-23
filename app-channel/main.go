@@ -54,7 +54,7 @@ func main() {
 	l := newBalanceLogger(chainURL)
 	l.LogBalances(alice, bob)
 
-	// Open app channel and play
+	// Open app channel and play.
 	log.Println("Opening channel.")
 	appAlice := alice.OpenAppChannel(bob.WireAddress())
 	appBob := bob.AcceptedChannel()
@@ -78,7 +78,7 @@ func main() {
 	log.Println("Bob's turn.")
 	appBob.Set(2, 1)
 
-	// Dispute
+	// Dispute channel state.
 	log.Println("Alice's turn.")
 	appAlice.ForceSet(1, 2)
 

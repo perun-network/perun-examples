@@ -37,7 +37,7 @@ const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
 )
 
-// AppClient is a app channel client.
+// AppClient is an app channel client.
 type AppClient struct {
 	perunClient *client.Client    // The core Perun client.
 	account     wallet.Address    // The account we use for on-chain and off-chain transactions.

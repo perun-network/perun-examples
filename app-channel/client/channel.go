@@ -9,7 +9,7 @@ import (
 	"perun.network/perun-examples/app-channel/app"
 )
 
-// TicTacToeChannel is a wrapper for a Perun channel for the tic-tac-toe app use case.
+// TicTacToeChannel is a wrapper for a Perun channel for the Tic-tac-toe app use case.
 type TicTacToeChannel struct {
 	ch *client.Channel
 }
@@ -19,7 +19,7 @@ func newTicTacToeChannel(ch *client.Channel) *TicTacToeChannel {
 	return &TicTacToeChannel{ch: ch}
 }
 
-// Set sends a game move to the channel peer
+// Set sends a game move to the channel peer.
 func (g *TicTacToeChannel) Set(x, y int) {
 	err := g.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
 		app, ok := state.App.(*app.TicTacToeApp)
@@ -34,7 +34,7 @@ func (g *TicTacToeChannel) Set(x, y int) {
 	}
 }
 
-// ForceSet registers a game move on-chain
+// ForceSet registers a game move on-chain.
 func (g *TicTacToeChannel) ForceSet(x, y int) {
 	err := g.ch.ForceUpdate(context.TODO(), func(state *channel.State) {
 		err := func() error {

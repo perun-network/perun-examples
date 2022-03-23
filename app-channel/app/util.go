@@ -163,7 +163,7 @@ func computeFinalBalances(bals channel.Balances, winner channel.Index) channel.B
 	loser := 1 - winner
 	finalBals := bals.Clone()
 	for i := range finalBals {
-		finalBals[i][winner] = new(big.Int).Add(bals[i][winner], bals[i][loser])
+		finalBals[i][winner] = new(big.Int).Add(bals[i][0], bals[i][1])
 		finalBals[i][loser] = big.NewInt(0)
 	}
 	return finalBals
