@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2022 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,46 +15,57 @@
 package client
 
 import (
-	"context"
-	"fmt"
-	"log"
 	"math/big"
+	"perun.network/go-perun/wire"
 
 	"github.com/ethereum/go-ethereum/common"
-	ewallet "perun.network/go-perun/backend/ethereum/wallet"
-	"perun.network/go-perun/channel"
-	"perun.network/go-perun/wallet"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 )
 
-func makeStakeAllocation(asset common.Address, stake *big.Int) *channel.Allocation {
-	return &channel.Allocation{
-		Assets:   []channel.Asset{ewallet.AsWalletAddr(asset)},
-		Balances: [][]*big.Int{{new(big.Int).Set(stake), new(big.Int).Set(stake)}},
+// CreateContractBackend creates a new contract backend.
+func CreateContractBackend(
+	nodeURL string,
+	chainID uint64,
+	w *swallet.Wallet,
+) (ethchannel.ContractBackend, error) {
+	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
+	transactor := swallet.NewTransactor(w, signer)
+
+	ethClient, err := ethclient.Dial(nodeURL)
+	if err != nil {
+		return ethchannel.ContractBackend{}, err
 	}
+
+	return ethchannel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
-func (c *Client) PerunAddress() wallet.Address {
-	return c.perunClient.Account.Address()
+// WalletAddress returns the wallet address of the client.
+func (c *AppClient) WalletAddress() common.Address {
+	return common.Address(*c.account.(*ethwallet.Address))
 }
 
-func (c *Client) Address() common.Address {
-	return c.perunClient.Account.EthAddress()
+// WireAddress returns the wire address of the client.
+func (c *AppClient) WireAddress() wire.Address {
+	return c.account
 }
 
-func (c *Client) challengeDurationInSeconds() uint64 {
-	return uint64(c.challengeDuration.Seconds())
+// EthToWei converts a given amount in ETH to Wei.
+func EthToWei(ethAmount *big.Float) (weiAmount *big.Int) {
+	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+	weiPerEthFloat := new(big.Float).SetInt(weiPerEth)
+	weiAmountFloat := new(big.Float).Mul(ethAmount, weiPerEthFloat)
+	weiAmount, _ = weiAmountFloat.Int(nil)
+	return weiAmount
 }
 
-func (c *Client) defaultContextWithTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), c.contextTimeout)
-}
-
-func (c *Client) Logf(format string, v ...interface{}) {
-	log.Printf("Client %v: %v", c.Address(), fmt.Sprintf(format, v...))
-}
-
-func (c *Client) OnChainBalance() (b *big.Int, err error) {
-	ctx, cancel := c.defaultContextWithTimeout()
-	defer cancel()
-	return c.perunClient.EthClient.BalanceAt(ctx, c.Address(), nil)
+// WeiToEth converts a given amount in Wei to ETH.
+func WeiToEth(weiAmount *big.Int) (ethAmount *big.Float) {
+	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
+	weiPerEthFloat := new(big.Float).SetInt(weiPerEth)
+	weiAmountFloat := new(big.Float).SetInt(weiAmount)
+	return new(big.Float).Quo(weiAmountFloat, weiPerEthFloat)
 }

@@ -10,6 +10,10 @@ import (
 )
 
 // TicTacToeAppData is the app data struct.
+// Grid:
+// 0 1 2
+// 3 4 5
+// 6 7 8
 type TicTacToeAppData struct {
 	NextActor uint8
 	Grid      [9]FieldValue
@@ -42,7 +46,7 @@ func (d *TicTacToeAppData) Clone() channel.Data {
 }
 
 func (d *TicTacToeAppData) Set(x, y int, actorIdx channel.Index) {
-	if d.NextActor != uint8safe(actorIdx) {
+	if d.NextActor != uint8safe(uint16(actorIdx)) {
 		panic("invalid actor")
 	}
 	v := makeFieldValueFromPlayerIdx(actorIdx)
