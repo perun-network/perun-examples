@@ -36,7 +36,7 @@ jobs:
           go run .
           docker stop ganache
 
-      - name: Payment Channel
+      - name: Payment Channel ETH
         working-directory: payment-channel
         env:
           KEY_DEPLOYER: '0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e'
@@ -48,6 +48,14 @@ jobs:
           sleep 5
           go run .
           docker stop ganache
+
+      - name: Payment Channel DOT
+        working-directory: payment-channel-dot
+        run: |
+          docker run --name polkadot --detach --rm -it -p 9944:9944 ghcr.io/perun-network/polkadot-test-node
+          sleep 5
+          go run .
+          docker stop polkadot
 
       - name: App Channel
         working-directory: app-channel
