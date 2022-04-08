@@ -17,13 +17,15 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	dotchannel "github.com/perun-network/perun-polkadot-backend/channel"
+	"github.com/perun-network/perun-polkadot-backend/channel/pallet"
+	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"math/big"
-	"perun.network/go-perun/wallet"
-
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
 
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
@@ -43,10 +45,22 @@ type PaymentClient struct {
 func SetupPaymentClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *dotwallet.Wallet, // w is the wallet used for signing transactions.
-	acc wallet.Address, // acc is the address of the account to be used for signing transactions.
-	adj channel.Adjudicator,
-	funder channel.Funder,
+	acc wallet.Account, // acc is the address of the account to be used for signing transactions.
+	nodeURL string, // nodeURL is the URL of the blockchain node.
+	networkId dot.NetworkID, // networkId is the identifier of the blockchain.
+	queryDepth types.BlockNumber, // queryDepth is the number of blocks being evaluated when looking for events.
 ) (*PaymentClient, error) {
+	// Connect to backend.
+	api, err := dot.NewAPI(nodeURL, networkId)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create Perun pallet and generate funder + adjudicator from it.
+	perun := pallet.NewPallet(pallet.NewPerunPallet(api), api.Metadata())
+	funder := pallet.NewFunder(perun, acc, 3)
+	adj := pallet.NewAdjudicator(acc, perun, api, queryDepth)
+
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
 	if err != nil {
@@ -54,7 +68,7 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	waddr := dotwallet.AsAddr(acc)
+	waddr := dotwallet.AsAddr(acc.Address())
 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")

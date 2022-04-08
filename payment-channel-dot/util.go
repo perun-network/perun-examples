@@ -16,7 +16,6 @@ package main
 
 import (
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
-	"github.com/perun-network/perun-polkadot-backend/channel/pallet"
 	"github.com/perun-network/perun-polkadot-backend/pkg/sr25519"
 	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	"perun.network/go-perun/wallet"
@@ -43,22 +42,14 @@ func setupPaymentClient(
 	w := dotwallet.NewWallet()
 	acc := w.ImportSK(sk)
 
-	// Connect to backend
-	api, err := dot.NewAPI(nodeURL, networkId)
-	if err != nil {
-		panic(err)
-	}
-	perun := pallet.NewPallet(pallet.NewPerunPallet(api), api.Metadata())
-	funder := pallet.NewFunder(perun, acc, 3)
-	adj := pallet.NewAdjudicator(acc, perun, api, queryDepth)
-
 	// Create and start client.
 	c, err := client.SetupPaymentClient(
 		bus,
 		w,
-		acc.Address(),
-		adj,
-		funder,
+		acc,
+		nodeURL,
+		networkId,
+		queryDepth,
 	)
 	if err != nil {
 		panic(err)
