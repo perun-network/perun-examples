@@ -122,7 +122,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentC
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
 
-	return newPaymentChannel(ch, dotchannel.Asset)
+	return newPaymentChannel(ch, c.currency)
 }
 
 // startWatching starts the dispute watcher for the specified channel.
