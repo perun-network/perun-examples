@@ -94,10 +94,11 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentC
 	participants := []wire.Address{c.account, peer}
 
 	// We create an initial allocation which defines the starting balances.
+	initBal := DotToPlanck(big.NewFloat(amount))
 	initAlloc := channel.NewAllocation(2, dotchannel.Asset)
 	initAlloc.SetAssetBalances(dotchannel.Asset, []channel.Bal{
-		DotToPlanck(big.NewFloat(amount)), // Our initial balance.
-		DotToPlanck(big.NewFloat(amount)), // Peer's initial balance.
+		initBal, // Our initial balance.
+		initBal, // Peer's initial balance.
 	})
 
 	// Prepare the channel proposal by defining the channel parameters.
