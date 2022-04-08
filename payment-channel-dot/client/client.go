@@ -44,8 +44,8 @@ type PaymentClient struct {
 // SetupPaymentClient creates a new payment client.
 func SetupPaymentClient(
 	bus wire.Bus, // bus is used of off-chain communication.
-	w *dotwallet.Wallet, // w is the wallet used for signing transactions.
-	acc wallet.Account, // acc is the address of the account to be used for signing transactions.
+	w *dotwallet.Wallet, // w is the wallet used to resolve addresses to accounts for channels.
+	acc wallet.Account, // acc is the account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	networkId dot.NetworkID, // networkId is the identifier of the blockchain.
 	queryDepth types.BlockNumber, // queryDepth is the number of blocks being evaluated when looking for events.
