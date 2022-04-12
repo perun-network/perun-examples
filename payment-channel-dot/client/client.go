@@ -56,7 +56,7 @@ func SetupPaymentClient(
 		panic(err)
 	}
 
-	// Create Perun pallet and generate funder + adjudicator from it.
+	// Connect to Perun pallet and get funder + adjudicator from it.
 	perun := pallet.NewPallet(pallet.NewPerunPallet(api), api.Metadata())
 	funder := pallet.NewFunder(perun, acc, 3)
 	adj := pallet.NewAdjudicator(acc, perun, api, queryDepth)
