@@ -45,6 +45,7 @@ const (
 type ChainConfig struct {
 	ChainID     ethchannel.ChainID
 	ChainURL    string
+	Token       common.Address
 	Adjudicator common.Address
 	AssetHolder common.Address
 }
@@ -83,7 +84,7 @@ func SetupPaymentClient(
 		if err != nil {
 			return nil, fmt.Errorf("validating adjudicator: %w", err)
 		}
-		err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, chain.AssetHolder, chain.Adjudicator)
+		err = ethchannel.ValidateAssetHolderERC20(context.TODO(), cb, chain.AssetHolder, chain.Adjudicator, chain.Token)
 		if err != nil {
 			return nil, fmt.Errorf("validating adjudicator: %w", err)
 		}
@@ -91,7 +92,7 @@ func SetupPaymentClient(
 		// Setup funder.
 		funder := ethchannel.NewFunder(cb)
 		// Register the asset on the funder.
-		dep := ethchannel.NewETHDepositor()
+		dep := ethchannel.NewERC20Depositor(chain.Token)
 		ethAcc := accounts.Account{Address: acc}
 		assets[i] = ethchannel.NewAsset(chain.ChainID.Int, chain.AssetHolder)
 		funder.RegisterAsset(*assets[i].(*ethchannel.Asset), dep, ethAcc)

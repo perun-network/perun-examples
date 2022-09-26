@@ -19,6 +19,9 @@ import (
 	"log"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/perun-network/perun-eth-backend/bindings/peruntoken"
+
 	"perun.network/perun-examples/multiledger-channel/client"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -33,8 +36,8 @@ import (
 
 // deployContracts deploys the Perun smart contracts on the specified chains and
 // sets the contract addresses.
-func deployContracts(chains []client.ChainConfig, privateKey string) {
-	k, err := crypto.HexToECDSA(privateKey)
+func deployContracts(chains []client.ChainConfig) {
+	k, err := crypto.HexToECDSA(keyDeployer)
 	if err != nil {
 		panic(err)
 	}
@@ -47,17 +50,27 @@ func deployContracts(chains []client.ChainConfig, privateKey string) {
 		}
 		acc := accounts.Account{Address: crypto.PubkeyToAddress(k.PublicKey)}
 
+		// Deploy the ERC20 PerunToken.
+		initAccs := []common.Address{privKeyToAddress(keyAlice), privKeyToAddress(keyBob)}
+		initAmount := client.EthToWei(big.NewFloat(initialTokenAmount))
+		token, err := ethchannel.DeployPerunToken(context.TODO(), cb, acc, initAccs, initAmount)
+		chains[i].Token = token
+		if err != nil {
+			panic(err)
+		}
+
 		// Deploy adjudicator.
 		chains[i].Adjudicator, err = ethchannel.DeployAdjudicator(context.TODO(), cb, acc)
 		if err != nil {
 			panic(err)
 		}
 
-		// Deploy asset holder.
-		chains[i].AssetHolder, err = ethchannel.DeployETHAssetholder(context.TODO(), cb, chains[i].Adjudicator, acc)
+		// Deploy ERC20 asset holder.
+		chains[i].AssetHolder, err = ethchannel.DeployERC20Assetholder(context.TODO(), cb, chains[i].Adjudicator, token, acc)
 		if err != nil {
 			panic(err)
 		}
+
 	}
 
 }
@@ -90,29 +103,62 @@ func setupPaymentClient(
 	return c
 }
 
-// balanceLogger is a utility for logging client balances.
-type balanceLogger struct {
-	ethClient *ethclient.Client
-}
-
-// newBalanceLogger creates a new balance logger for the specified ledger.
-func newBalanceLogger(chainURL string) balanceLogger {
-	c, err := ethclient.Dial(chainURL)
+func privKeyToAddress(privateKey string) common.Address {
+	pk, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
 		panic(err)
 	}
-	return balanceLogger{ethClient: c}
+
+	return crypto.PubkeyToAddress(pk.PublicKey)
 }
 
-// LogBalances prints the balances of the specified accounts.
-func (l balanceLogger) LogBalances(accounts ...common.Address) {
-	bals := make([]*big.Float, len(accounts))
-	for i, c := range accounts {
-		bal, err := l.ethClient.BalanceAt(context.TODO(), c, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		bals[i] = client.WeiToEth(bal)
+// balanceLogger is a utility for logging client balances on two chains (A & B).
+type balanceLogger struct {
+	ethClientA *ethclient.Client
+	ethClientB *ethclient.Client
+	tokenA     common.Address
+	tokenB     common.Address
+}
+
+// newBalanceLogger creates a new balance logger for the specified ledger.
+func newBalanceLogger(chainA, chainB client.ChainConfig) balanceLogger {
+	clientA, err := ethclient.Dial(chainA.ChainURL)
+	if err != nil {
+		panic(err)
 	}
-	log.Println("Client balances (ETH):", bals)
+
+	clientB, err := ethclient.Dial(chainB.ChainURL)
+	if err != nil {
+		panic(err)
+	}
+	return balanceLogger{
+		ethClientA: clientA,
+		ethClientB: clientB,
+		tokenA:     chainA.Token,
+		tokenB:     chainA.Token,
+	}
+}
+
+// LogBalances prints the token balances of the specified clients on the two chains.
+func (l balanceLogger) LogBalances(addresses ...common.Address) {
+	getBals := func(cb bind.ContractBackend, token common.Address) []*big.Float {
+		bals := make([]*big.Float, len(addresses))
+
+		t, err := peruntoken.NewPeruntoken(token, cb)
+		if err != nil {
+			panic(err)
+		}
+
+		for i, a := range addresses {
+			bal, err := t.BalanceOf(&bind.CallOpts{}, a)
+			if err != nil {
+				log.Fatal(err)
+			}
+			bals[i] = client.WeiToEth(bal)
+		}
+		return bals
+	}
+
+	log.Println("Client balances Chain A (PRN):", getBals(l.ethClientA, l.tokenA))
+	log.Println("Client balances Chain B (PRN):", getBals(l.ethClientB, l.tokenB))
 }

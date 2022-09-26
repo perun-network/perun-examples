@@ -35,6 +35,8 @@ const (
 	keyDeployer = "79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
 	keyAlice    = "1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
 	keyBob      = "f63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+
+	initialTokenAmount = 100
 )
 
 // main runs a demo of a multi-ledger channel. It assumes that two blockchain
@@ -57,7 +59,7 @@ func main() {
 
 	// deployContracts will set the contract addresses of the chain
 	// configurations after it deployed them.
-	deployContracts(chains[:], keyDeployer)
+	deployContracts(chains[:])
 
 	// Setup clients.
 	log.Println("Setting up clients.")
@@ -66,23 +68,22 @@ func main() {
 	bob := setupPaymentClient(bus, keyBob, chains)
 
 	// Print balances before transactions.
-	l := newBalanceLogger(chainAURL)
+	l := newBalanceLogger(chains[0], chains[1])
 	l.LogBalances(alice.WalletAddress(), bob.WalletAddress())
 
 	// Open channel, transact, close.
 	log.Println("Opening channel and depositing funds.")
 
 	// The balances that each party puts in the channel from the specific chain.
-	chainABalances := [2]float64{5, 0}     // Alice puts 5 ETH from chain A in the channel.
-	chainBBalances := [2]float64{0, 13.37} // Bob puts 13.37 ETH from chain B in the channel.
+	chainABalances := [2]float64{15, 0} // Alice puts 5 PRN from chain A in the channel.
+	chainBBalances := [2]float64{0, 42} // Bob puts 13.37 PRN from chain B in the channel.
 
 	chAlice := alice.OpenChannel(bob.WireAddress(), chainABalances, chainBBalances)
 	chBob := bob.AcceptedChannel()
 
 	log.Println("Sending payments...")
-	chAlice.SendPayment(3, client.ChainAIdx)
-	chBob.SendPayment(1, client.ChainBIdx)
-	chAlice.SendPayment(1, client.ChainBIdx)
+	chAlice.SendPayment(15, client.ChainAIdx)
+	chBob.SendPayment(42, client.ChainBIdx)
 
 	log.Println("Settling channel.")
 	chAlice.Settle() // Conclude and withdraw.
