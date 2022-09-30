@@ -42,12 +42,13 @@ const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
 )
 
+// ChainConfig is used to hold all information needed about a specific chain.
 type ChainConfig struct {
 	ChainID     ethchannel.ChainID
 	ChainURL    string
-	Token       common.Address
-	Adjudicator common.Address
-	AssetHolder common.Address
+	Token       common.Address // The address of the deployed ERC20 token.
+	Adjudicator common.Address // The address of the deployed Adjudicator contract.
+	AssetHolder common.Address // The address of the deployed AssetHolder contract.
 }
 
 // PaymentClient is a payment channel client.
