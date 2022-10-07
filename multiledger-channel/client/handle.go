@@ -78,14 +78,24 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 			return fmt.Errorf("Invalid assets: %v", err)
 		}
 
-		// Check that our balance is only increasing for all currencies in the channel.
+		// Check the swap of the two currencies.
 		for _, currency := range c.currencies {
-			receiverIdx := 1 - next.ActorIdx // This works because we are in a two-party channel.
-			curBal := cur.Allocation.Balance(receiverIdx, currency)
-			nextBal := next.State.Allocation.Balance(receiverIdx, currency)
-			if nextBal.Cmp(curBal) < 0 {
-				return fmt.Errorf("Invalid balance: %v", nextBal)
+			myIdx := 1 - next.ActorIdx // This works because we are in a two-party channel.
+			// Get our and the peer's current balance.
+			ourCurBal := cur.Balance(myIdx, currency)
+			peerCurBal := cur.Balance(next.ActorIdx, currency)
+			// Get our and the peer's balance of the next proposed state.
+			ourNextBal := next.State.Balance(myIdx, currency)
+			peerNextBal := next.State.Balance(next.ActorIdx, currency)
+
+			// Check that the balances are "swapped".
+			if !(ourCurBal.Cmp(peerNextBal) == 0 && ourNextBal.Cmp(peerCurBal) == 0) {
+				return fmt.Errorf("invalid swap of balances")
 			}
+		}
+
+		if !next.State.IsFinal {
+			return fmt.Errorf("swap update must be final")
 		}
 
 		return nil

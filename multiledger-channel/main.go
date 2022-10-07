@@ -20,6 +20,7 @@ import (
 
 	echannel "github.com/perun-network/perun-eth-backend/channel"
 
+	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/multiledger-channel/client"
 )
@@ -74,16 +75,19 @@ func main() {
 	// Open channel, transact, close.
 	log.Println("Opening channel and depositing funds.")
 
-	// The balances that each party puts in the channel from the specific chain.
-	chainABalances := [2]float64{15, 0} // Alice puts 5 PRN from chain A in the channel.
-	chainBBalances := [2]float64{0, 42} // Bob puts 13.37 PRN from chain B in the channel.
+	var alicePRNChainA int64 = 20 // Alice puts 20 PRN from chain A in the channel.
+	var bobPRNChainB int64 = 50   // Bob puts 50 PRN from chain B in the channel.
+	// The balances that each party puts in the channel.
+	balances := channel.Balances{
+		{big.NewInt(alicePRNChainA), big.NewInt(0)},
+		{big.NewInt(0), big.NewInt(bobPRNChainB)},
+	}
 
-	chAlice := alice.OpenChannel(bob.WireAddress(), chainABalances, chainBBalances)
+	chAlice := alice.OpenChannel(bob.WireAddress(), balances)
 	chBob := bob.AcceptedChannel()
 
-	log.Println("Sending payments...")
-	chAlice.SendPayment(15, client.ChainAIdx)
-	chBob.SendPayment(42, client.ChainBIdx)
+	log.Println("Performing the swap...")
+	chAlice.PerformSwap()
 
 	log.Println("Settling channel.")
 	chAlice.Settle() // Conclude and withdraw.

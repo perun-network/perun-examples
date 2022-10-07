@@ -24,8 +24,6 @@ import (
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
 	"github.com/perun-network/perun-eth-backend/wire"
-
-	"perun.network/go-perun/channel"
 )
 
 // CreateContractBackend creates a new contract backend.
@@ -53,30 +51,4 @@ func (c *PaymentClient) WalletAddress() common.Address {
 // WireAddress returns the wire address of the client.
 func (c *PaymentClient) WireAddress() *wire.Address {
 	return &wire.Address{Address: ethwallet.AsWalletAddr(c.WalletAddress())}
-}
-
-// EthToWei converts a given amount in ETH to Wei.
-func EthToWei(ethAmount *big.Float) (weiAmount *big.Int) {
-	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
-	weiPerEthFloat := new(big.Float).SetInt(weiPerEth)
-	weiAmountFloat := new(big.Float).Mul(ethAmount, weiPerEthFloat)
-	weiAmount, _ = weiAmountFloat.Int(nil)
-	return weiAmount
-}
-
-// WeiToEth converts a given amount in Wei to ETH.
-func WeiToEth(weiAmount *big.Int) (ethAmount *big.Float) {
-	weiPerEth := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
-	weiPerEthFloat := new(big.Float).SetInt(weiPerEth)
-	weiAmountFloat := new(big.Float).SetInt(weiAmount)
-	return new(big.Float).Quo(weiAmountFloat, weiPerEthFloat)
-}
-
-// getChainAssets returns the assets on the different chains.
-func getChainsAssets(chains []ChainConfig) []channel.Asset {
-	assets := make([]channel.Asset, len(chains))
-	for i, chain := range chains {
-		assets[i] = ethchannel.NewAsset(chain.ChainID.Int, chain.AssetHolder)
-	}
-	return assets
 }

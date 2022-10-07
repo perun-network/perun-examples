@@ -16,7 +16,6 @@ package client
 
 import (
 	"context"
-	"math/big"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -36,15 +35,19 @@ func newPaymentChannel(ch *client.Channel, currencies [2]channel.Asset) *Payment
 	}
 }
 
-// SendPayment sends a payment to the channel peer.
-func (c PaymentChannel) SendPayment(amount float64, chainIndex int) {
-	// Transfer the given amount from us to peer.
-	// Use UpdateBy to update the channel state.
+// PerformSwap performs a swap by "swapping" the balances of the two
+// participants for both assets.
+func (c PaymentChannel) PerformSwap() {
 	err := c.ch.Update(context.TODO(), func(state *channel.State) { // We use context.TODO to keep the code simple.
-		ethAmount := EthToWei(big.NewFloat(amount))
-		actor := c.ch.Idx()
-		peer := 1 - actor
-		state.Allocation.TransferBalance(actor, peer, c.assets[chainIndex], ethAmount)
+		// We simply swap the balances for the two assets.
+		state.Balances = channel.Balances{
+			{state.Balances[0][1], state.Balances[0][0]},
+			{state.Balances[1][1], state.Balances[1][0]},
+		}
+
+		// Set the state to final because we do not expect any other updates
+		// than this swap.
+		state.IsFinal = true
 	})
 	if err != nil {
 		panic(err) // We panic on error to keep the code simple.
@@ -53,16 +56,6 @@ func (c PaymentChannel) SendPayment(amount float64, chainIndex int) {
 
 // Settle settles the payment channel and withdraws the funds.
 func (c PaymentChannel) Settle() {
-	// Finalize the channel to enable fast settlement.
-	if !c.ch.State().IsFinal {
-		err := c.ch.Update(context.TODO(), func(state *channel.State) {
-			state.IsFinal = true
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	// Settle concludes the channel and withdraws the funds.
 	err := c.ch.Settle(context.TODO(), false)
 	if err != nil {

@@ -52,7 +52,7 @@ func deployContracts(chains []client.ChainConfig) {
 
 		// Deploy the ERC20 PerunToken.
 		initAccs := []common.Address{privKeyToAddress(keyAlice), privKeyToAddress(keyBob)}
-		initAmount := client.EthToWei(big.NewFloat(initialTokenAmount))
+		initAmount := big.NewInt(initialTokenAmount)
 		token, err := ethchannel.DeployPerunToken(context.TODO(), cb, acc, initAccs, initAmount)
 		chains[i].Token = token
 		if err != nil {
@@ -141,8 +141,8 @@ func newBalanceLogger(chainA, chainB client.ChainConfig) balanceLogger {
 
 // LogBalances prints the token balances of the specified clients on the two chains.
 func (l balanceLogger) LogBalances(addresses ...common.Address) {
-	getBals := func(cb bind.ContractBackend, token common.Address) []*big.Float {
-		bals := make([]*big.Float, len(addresses))
+	getBals := func(cb bind.ContractBackend, token common.Address) []*big.Int {
+		bals := make([]*big.Int, len(addresses))
 
 		t, err := peruntoken.NewPeruntoken(token, cb)
 		if err != nil {
@@ -154,7 +154,7 @@ func (l balanceLogger) LogBalances(addresses ...common.Address) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			bals[i] = client.WeiToEth(bal)
+			bals[i] = bal
 		}
 		return bals
 	}

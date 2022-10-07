@@ -17,7 +17,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
@@ -37,8 +36,6 @@ import (
 )
 
 const (
-	ChainAIdx       = 0
-	ChainBIdx       = 1
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
 )
 
@@ -133,7 +130,7 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer wire.Address, chainABalances, chainBBalances [2]float64) *PaymentChannel {
+func (c *PaymentClient) OpenChannel(peer wire.Address, balances channel.Balances) *PaymentChannel {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
@@ -142,16 +139,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, chainABalances, chainBBal
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, c.currencies[0], c.currencies[1])
-	// The balances for the asset of chain A.
-	initAlloc.SetAssetBalances(c.currencies[ChainAIdx], []channel.Bal{
-		EthToWei(big.NewFloat(chainABalances[0])), // Our initial balance of chain A's asset.
-		EthToWei(big.NewFloat(chainABalances[1])), // Peer's initial balance of chain A's asset.
-	})
-	// The balances for the asset of chain B.
-	initAlloc.SetAssetBalances(c.currencies[ChainBIdx], []channel.Bal{
-		EthToWei(big.NewFloat(chainBBalances[0])), // Our initial balance of chain B's asset.
-		EthToWei(big.NewFloat(chainBBalances[1])), // Peer's initial balance of chain B's asset.
-	})
+	initAlloc.Balances = balances
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
