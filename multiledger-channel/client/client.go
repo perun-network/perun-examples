@@ -69,6 +69,9 @@ func SetupPaymentClient(
 	multiAdjudicator := multi.NewAdjudicator()
 
 	var assets [2]channel.Asset
+	for i, chain := range chains {
+		assets[i] = ethchannel.NewAsset(chain.ChainID.Int, chain.AssetHolder)
+	}
 
 	for i, chain := range chains {
 		// Create Ethereum client and contract backend.
@@ -92,8 +95,10 @@ func SetupPaymentClient(
 		// Register the asset on the funder.
 		dep := ethchannel.NewERC20Depositor(chain.Token)
 		ethAcc := accounts.Account{Address: acc}
-		assets[i] = ethchannel.NewAsset(chain.ChainID.Int, chain.AssetHolder)
 		funder.RegisterAsset(*assets[i].(*ethchannel.Asset), dep, ethAcc)
+		// We have to register the asset of the other chain too, but use a
+		// NoOpDepositor there since this funder can ignore it.
+		funder.RegisterAsset(*assets[1-i].(*ethchannel.Asset), ethchannel.NewNoOpDepositor(), ethAcc)
 		// Register the funder on the multi-funder.
 		multiFunder.RegisterFunder(chain.ChainID, funder)
 
