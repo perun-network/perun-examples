@@ -44,11 +44,11 @@ func CreateContractBackend(
 }
 
 // WalletAddress returns the wallet address of the client.
-func (c *PaymentClient) WalletAddress() common.Address {
+func (c *SwapClient) WalletAddress() common.Address {
 	return common.Address(*c.account.(*ethwallet.Address))
 }
 
 // WireAddress returns the wire address of the client.
-func (c *PaymentClient) WireAddress() *wire.Address {
+func (c *SwapClient) WireAddress() *wire.Address {
 	return &wire.Address{Address: ethwallet.AsWalletAddr(c.WalletAddress())}
 }

@@ -25,7 +25,7 @@ import (
 )
 
 // HandleProposal is the callback for incoming channel proposals.
-func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
+func (c *SwapClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
 	lcp, err := func() (*client.LedgerChannelProposalMsg, error) {
 		// Ensure that we got a ledger channel proposal.
 		lcp, ok := p.(*client.LedgerChannelProposalMsg)
@@ -66,11 +66,11 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 	c.startWatching(ch)
 
 	// Store channel.
-	c.channels <- newPaymentChannel(ch, c.currencies)
+	c.channels <- newSwapChannel(ch, c.currencies)
 }
 
 // HandleUpdate is the callback for incoming channel updates.
-func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
+func (c *SwapClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
 	// We accept every update that increases our balance.
 	err := func() error {
 		err := channel.AssertAssetsEqual(cur.Assets, next.State.Assets)
@@ -112,6 +112,6 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 }
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
-func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
+func (c *SwapClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 	log.Printf("Adjudicator event: type = %T, client = %v", e, c.account)
 }

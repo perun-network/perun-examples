@@ -48,21 +48,21 @@ type ChainConfig struct {
 	AssetHolder common.Address // The address of the deployed AssetHolder contract.
 }
 
-// PaymentClient is a payment channel client.
-type PaymentClient struct {
-	perunClient *client.Client       // The core Perun client.
-	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
-	currencies  [2]channel.Asset     // The currencies of the different chains we support.
-	channels    chan *PaymentChannel // Accepted payment channels.
+// SwapClient is a channel client for swaps.
+type SwapClient struct {
+	perunClient *client.Client    // The core Perun client.
+	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
+	currencies  [2]channel.Asset  // The currencies of the different chains we support.
+	channels    chan *SwapChannel // Accepted payment channels.
 }
 
-// SetupPaymentClient creates a new payment client.
-func SetupPaymentClient(
+// SetupSwapClient creates a new swap client.
+func SetupSwapClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
 	acc common.Address, // acc is the address of the account to be used for signing transactions.
 	chains [2]ChainConfig, // chains represent the two chains the client should be able to use.
-) (*PaymentClient, error) {
+) (*SwapClient, error) {
 	// The multi-funder and multi-adjudicator will be registered with a funder /
 	// adjudicators for each chain.
 	multiFunder := multi.NewFunder()
@@ -123,11 +123,11 @@ func SetupPaymentClient(
 	}
 
 	// Create client and start request handler.
-	c := &PaymentClient{
+	c := &SwapClient{
 		perunClient: perunClient,
 		account:     walletAddr,
 		currencies:  assets,
-		channels:    make(chan *PaymentChannel, 1),
+		channels:    make(chan *SwapChannel, 1),
 	}
 	go perunClient.Handle(c, c)
 
@@ -135,7 +135,7 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer wire.Address, balances channel.Balances) *PaymentChannel {
+func (c *SwapClient) OpenChannel(peer wire.Address, balances channel.Balances) *SwapChannel {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
@@ -167,11 +167,11 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, balances channel.Balances
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
 
-	return newPaymentChannel(ch, c.currencies)
+	return newSwapChannel(ch, c.currencies)
 }
 
 // startWatching starts the dispute watcher for the specified channel.
-func (c *PaymentClient) startWatching(ch *client.Channel) {
+func (c *SwapClient) startWatching(ch *client.Channel) {
 	go func() {
 		err := ch.Watch(c)
 		if err != nil {
@@ -181,11 +181,11 @@ func (c *PaymentClient) startWatching(ch *client.Channel) {
 }
 
 // AcceptedChannel returns the next accepted channel.
-func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
+func (c *SwapClient) AcceptedChannel() *SwapChannel {
 	return <-c.channels
 }
 
 // Shutdown gracefully shuts down the client.
-func (c *PaymentClient) Shutdown() {
+func (c *SwapClient) Shutdown() {
 	c.perunClient.Close()
 }

@@ -80,7 +80,7 @@ func setupPaymentClient(
 	bus wire.Bus,
 	privateKey string,
 	chains [2]client.ChainConfig,
-) *client.PaymentClient {
+) *client.SwapClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
 	if err != nil {
@@ -90,7 +90,7 @@ func setupPaymentClient(
 	acc := crypto.PubkeyToAddress(k.PublicKey)
 
 	// Create and start client.
-	c, err := client.SetupPaymentClient(
+	c, err := client.SetupSwapClient(
 		bus,
 		w,
 		acc,

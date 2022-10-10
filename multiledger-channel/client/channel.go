@@ -21,15 +21,15 @@ import (
 	"perun.network/go-perun/client"
 )
 
-// PaymentChannel is a wrapper for a Perun channel for the payment use case.
-type PaymentChannel struct {
+// SwapChannel is a wrapper for a Perun channel for the swap use case.
+type SwapChannel struct {
 	ch     *client.Channel
 	assets [2]channel.Asset
 }
 
-// newPaymentChannel creates a new payment channel.
-func newPaymentChannel(ch *client.Channel, currencies [2]channel.Asset) *PaymentChannel {
-	return &PaymentChannel{
+// newSwapChannel creates a new channel for swaps.
+func newSwapChannel(ch *client.Channel, currencies [2]channel.Asset) *SwapChannel {
+	return &SwapChannel{
 		ch:     ch,
 		assets: currencies,
 	}
@@ -37,7 +37,7 @@ func newPaymentChannel(ch *client.Channel, currencies [2]channel.Asset) *Payment
 
 // PerformSwap performs a swap by "swapping" the balances of the two
 // participants for both assets.
-func (c PaymentChannel) PerformSwap() {
+func (c SwapChannel) PerformSwap() {
 	err := c.ch.Update(context.TODO(), func(state *channel.State) { // We use context.TODO to keep the code simple.
 		// We simply swap the balances for the two assets.
 		state.Balances = channel.Balances{
@@ -54,8 +54,8 @@ func (c PaymentChannel) PerformSwap() {
 	}
 }
 
-// Settle settles the payment channel and withdraws the funds.
-func (c PaymentChannel) Settle() {
+// Settle settles the channel and withdraws the funds.
+func (c SwapChannel) Settle() {
 	// Settle concludes the channel and withdraws the funds.
 	err := c.ch.Settle(context.TODO(), false)
 	if err != nil {
