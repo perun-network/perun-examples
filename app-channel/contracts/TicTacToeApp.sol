@@ -86,6 +86,20 @@ contract TicTacToeApp is App {
         requireEqualUint256ArrayArray(to.outcome.balances, expectedBalances);
     }
 
+    /// @dev Asserts that a and b are equal.
+    function requireEqualAddressArray(
+        address[] memory a,
+        address[] memory b
+    )
+    internal
+    pure
+    {
+        require(a.length == b.length, "address[]: unequal length");
+        for (uint i = 0; i < a.length; i++) {
+            require(a[i] == b[i], "address[]: unequal item");
+        }
+    }
+
     function checkFinal(bytes memory d) internal pure returns (bool isFinal, bool hasWinner, uint8 winner) {
         // 0 1 2
         // 3 4 5
