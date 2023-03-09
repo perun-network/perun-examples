@@ -6,7 +6,7 @@ jobs:
     name: Test Examples
     runs-on: ubuntu-latest
     env:
-      gananache-image: trufflesuite/ganache-cli:v6.12.2
+      ganache-image: trufflesuite/ganache-cli:v6.12.2
 
     steps:
       - uses: actions/checkout@v3
@@ -22,16 +22,16 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      
+
       - name: Pull ganache-cli image
-        run: docker pull ${{ env.gananache-image }}
+        run: docker pull ${{ env.ganache-image }}
 
       - name: Simple Client
         working-directory: simple-client
         env:
           MNEMONIC: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
         run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.gananache-image }} -b 5 -a 2 -m "$MNEMONIC"
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }} -b 5 -a 2 -m "$MNEMONIC"
           sleep 5
           go run .
           docker stop ganache
@@ -39,12 +39,12 @@ jobs:
       - name: Payment Channel ETH
         working-directory: payment-channel
         env:
-          KEY_DEPLOYER: '0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e'
-          KEY_ALICE: '0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f'
-          KEY_BOB: '0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e'
-          BALANCE: '10000000000000000000'
+          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+          BALANCE: "10000000000000000000"
         run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.gananache-image }} --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5
+          docker run --rm --name ganache --detach --publish 8545:8545 trufflesuite/ganache:latest --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5 --gasPrice=0
           sleep 5
           go run .
           docker stop ganache
@@ -60,12 +60,12 @@ jobs:
       - name: App Channel
         working-directory: app-channel
         env:
-          KEY_DEPLOYER: '0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e'
-          KEY_ALICE: '0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f'
-          KEY_BOB: '0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e'
-          BALANCE: '10000000000000000000'
+          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+          BALANCE: "10000000000000000000"
         run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.gananache-image }} --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }} --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5
           sleep 5
           go run .
           docker stop ganache
@@ -73,7 +73,7 @@ jobs:
       - name: Collateralized Channels
         working-directory: collateralized-channels
         env:
-          GANACHE_CMD: "docker run --name ganache --rm --publish 8545:8545 ${{ env.gananache-image }}"
+          GANACHE_CMD: "docker run --name ganache --rm --publish 8545:8545 ${{ env.ganache-image }}"
         run: |
           go test -v -timeout 60s .
           docker stop ganache || true # Cleanup
