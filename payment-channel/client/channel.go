@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"math/big"
-
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
@@ -26,12 +25,11 @@ func newPaymentChannel(ch *client.Channel, currency channel.Asset) *PaymentChann
 func (c PaymentChannel) SendPayment(amount float64) {
 	// Transfer the given amount from us to peer.
 	// Use UpdateBy to update the channel state.
-	err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error { // We use context.TODO to keep the code simple.
+	err := c.ch.Update(context.TODO(), func(state *channel.State) { // We use context.TODO to keep the code simple.
 		ethAmount := EthToWei(big.NewFloat(amount))
 		actor := c.ch.Idx()
 		peer := 1 - actor
 		state.Allocation.TransferBalance(actor, peer, c.currency, ethAmount)
-		return nil
 	})
 	if err != nil {
 		panic(err) // We panic on error to keep the code simple.
@@ -42,9 +40,8 @@ func (c PaymentChannel) SendPayment(amount float64) {
 func (c PaymentChannel) Settle() {
 	// Finalize the channel to enable fast settlement.
 	if !c.ch.State().IsFinal {
-		err := c.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
+		err := c.ch.Update(context.TODO(), func(state *channel.State) {
 			state.IsFinal = true
-			return nil
 		})
 		if err != nil {
 			panic(err)

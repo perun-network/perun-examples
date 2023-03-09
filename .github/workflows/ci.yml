@@ -6,7 +6,11 @@ jobs:
     name: Test Examples
     runs-on: ubuntu-latest
     env:
+<<<<<<< HEAD
       ganache-image: trufflesuite/ganache:v7.9.1
+=======
+      ganache-image: trufflesuite/ganache-cli:v6.12.2
+>>>>>>> 74b8493 (payment-channel: Update go-perun methods used in client for compatibility to go-perun 0.10.6)
 
     steps:
       - uses: actions/checkout@v3
@@ -22,8 +26,13 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+<<<<<<< HEAD
       
       - name: Pull ganache image
+=======
+
+      - name: Pull ganache-cli image
+>>>>>>> 74b8493 (payment-channel: Update go-perun methods used in client for compatibility to go-perun 0.10.6)
         run: docker pull ${{ env.ganache-image }}
 
       - name: Simple Client
@@ -44,7 +53,11 @@ jobs:
           KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
           BALANCE: "10000000000000000000"
         run: |
+<<<<<<< HEAD
           docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }} --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
+=======
+          docker run --rm --name ganache --detach --publish 8545:8545 trufflesuite/ganache:latest --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5 --gasPrice=0
+>>>>>>> 74b8493 (payment-channel: Update go-perun methods used in client for compatibility to go-perun 0.10.6)
           sleep 5
           go run .
           docker stop ganache
@@ -65,7 +78,11 @@ jobs:
           KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
           BALANCE: "10000000000000000000"
         run: |
+<<<<<<< HEAD
           docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }}  --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
+=======
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }} --account $KEY_DEPLOYER,$BALANCE --account $KEY_ALICE,$BALANCE --account $KEY_BOB,$BALANCE --blockTime=5
+>>>>>>> 74b8493 (payment-channel: Update go-perun methods used in client for compatibility to go-perun 0.10.6)
           sleep 5
           go run .
           docker stop ganache

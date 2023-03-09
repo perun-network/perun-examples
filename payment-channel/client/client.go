@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"math/big"
 
-	ethchannel "perun.network/go-perun/backend/ethereum/channel"
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
-	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	ethchannel "github.com/perun-network/perun-eth-backend/channel"
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
+	ethwire "github.com/perun-network/perun-eth-backend/wire"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
@@ -33,14 +35,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
-)
-
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
-	perunClient *client.Client       // The core Perun client.
-	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
+	perunClient *client.Client // The core Perun client.
+	account     wallet.Address // The account we use for on-chain and off-chain transactions.
+	waddress    wire.Address
 	currency    channel.Asset        // The currency we expect to get paid in.
 	channels    chan *PaymentChannel // Accepted payment channels.
 }
@@ -50,10 +49,11 @@ func SetupPaymentClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
 	acc common.Address, // acc is the address of the account to be used for signing transactions.
+	eaddress *ethwallet.Address, // eaddress is the address of the Ethereum account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
-	asset ethwallet.Address, // asset is the address of the asset holder for our payment channels.
+	assetaddr ethwallet.Address, // asset is the address of the asset holder for our payment channels.
 ) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -66,7 +66,7 @@ func SetupPaymentClient(
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
-	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(asset), adjudicator)
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(assetaddr), adjudicator)
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
@@ -75,7 +75,8 @@ func SetupPaymentClient(
 	funder := ethchannel.NewFunder(cb)
 	dep := ethchannel.NewETHDepositor()
 	ethAcc := accounts.Account{Address: acc}
-	funder.RegisterAsset(asset, dep, ethAcc)
+	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
+	funder.RegisterAsset(*asset, dep, ethAcc)
 
 	// Setup adjudicator.
 	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
@@ -87,7 +88,7 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	waddr := ethwallet.AsWalletAddr(acc)
+	waddr := &ethwire.Address{Address: eaddress}
 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
@@ -96,8 +97,9 @@ func SetupPaymentClient(
 	// Create client and start request handler.
 	c := &PaymentClient{
 		perunClient: perunClient,
-		account:     waddr,
-		currency:    &asset,
+		account:     eaddress,
+		waddress:    waddr,
+		currency:    asset,
 		channels:    make(chan *PaymentChannel, 1),
 	}
 	go perunClient.Handle(c, c)
@@ -110,7 +112,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentC
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	participants := []wire.Address{c.account, peer}
+	participants := []wire.Address{c.waddress, peer}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, c.currency)
