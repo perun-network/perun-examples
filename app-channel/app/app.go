@@ -41,6 +41,10 @@ func (a *TicTacToeApp) Def() wallet.Address {
 	return a.Addr
 }
 
+func (a *TicTacToeApp) NewData() channel.Data {
+	return &TicTacToeAppData{}
+}
+
 func (a *TicTacToeApp) InitData(firstActor channel.Index) *TicTacToeAppData {
 	return &TicTacToeAppData{
 		NextActor: uint8(firstActor),
@@ -93,9 +97,9 @@ func (a *TicTacToeApp) ValidInit(p *channel.Params, s *channel.State) error {
 
 // ValidTransition is called whenever the channel state transitions.
 func (a *TicTacToeApp) ValidTransition(params *channel.Params, from, to *channel.State, idx channel.Index) error {
-	err := channel.AssetsAssertEqual(from.Assets, to.Assets)
+	err := channel.AssertAssetsEqual(from.Assets, to.Assets)
 	if err != nil {
-		return fmt.Errorf("Invalid assets: %v", err)
+		return fmt.Errorf("invalid assets: %v", err)
 	}
 
 	fromData, ok := from.Data.(*TicTacToeAppData)
