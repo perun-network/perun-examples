@@ -61,7 +61,7 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 		panic(err)
 	}
 
-	const gasLimit = 2200000 // Must be sufficient for deploying TicTacToe.sol.
+	const gasLimit = 2200000 // Must be sufficient for deploying TicTacToeApp.sol.
 	tops, err := cb.NewTransactor(context.TODO(), gasLimit, acc)
 	if err != nil {
 		panic(err)

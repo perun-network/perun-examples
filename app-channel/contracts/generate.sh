@@ -40,6 +40,10 @@ generate_bindings() {
 
     # Generate bindings.
     $ABIGEN --pkg $PKG --abi $GENDIR/$FILE.abi --bin $GENDIR/$FILE.bin --out $GENDIR/$CONTRACT.go
+
+     # Clean up .abi and .bin files
+    find $GENDIR -name "*.abi" -type f -delete
+    find $GENDIR -name "*.bin" -type f -delete
 }
 
 generate_bindings "TicTacToeApp" "ticTacToeApp"
