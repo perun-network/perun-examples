@@ -18,8 +18,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/perun-network/perun-eth-backend/wallet"
 	"github.com/pkg/errors"
-	"perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -33,12 +33,10 @@ func peerAddress(ch *client.Channel) common.Address {
 	return wallet.AsEthAddr(ch.Params().Parts[1-int(ch.Idx())])
 }
 
-func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *client.ProposalResponder) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+// HandleProposal handles channel proposals.
+func (c *AppClient) HandleProposal(proposal client.ChannelProposal, responder *client.ProposalResponder) {
 	log.Tracef("incoming channel proposal: %v", proposal)
-	_proposal, ok := proposal.(*client.LedgerChannelProposal)
+	_proposal, ok := proposal.(*client.LedgerChannelProposalMsg)
 	if !ok {
 		responder.Reject(c.defaultContext(), "accepting only ledger channel proposals")
 		return
@@ -47,7 +45,7 @@ func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *clie
 		return
 	}
 
-	accept := _proposal.Accept(c.PerunAddress(), client.WithRandomNonce())
+	accept := _proposal.Accept(c.account, client.WithRandomNonce())
 	ch, err := responder.Accept(c.defaultContext(), accept)
 	if err != nil {
 		log.Errorf("accepting channel proposal: %v", err)
@@ -57,30 +55,28 @@ func (c *Client) HandleProposal(proposal client.ChannelProposal, responder *clie
 	c.onNewChannel(ch)
 }
 
-func (c *Client) HandleUpdate(update client.ChannelUpdate, responder *client.UpdateResponder) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+// HandleUpdate handles channel updates.
+func (c *AppClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, responder *client.UpdateResponder) {
 	// Get channel and peer.
-	peer, ch, ok := c.peerWithChannelForChannelID(update.State.ID)
+	peer, ch, ok := c.peerWithChannelForChannelID(cur.ID)
 	if !ok {
 		responder.Reject(c.defaultContext(), "unknown channel")
 		return
 	}
 
 	// Get current and proposed balances.
-	curData, ok := ch.state.Data.(app.CollateralAppData)
+	curData, ok := ch.state.Data.(*app.CollateralAppData)
 	if !ok {
 		responder.Reject(c.defaultContext(), "failed to parse current app data")
 		return
 	}
-	propData, ok := update.State.Data.(app.CollateralAppData)
+	propData, ok := next.State.Data.(*app.CollateralAppData)
 	if !ok {
 		responder.Reject(c.defaultContext(), "failed to parse proposed app data")
 		return
 	}
-	curBal, _ := curData.Balance(ch.Params().Parts, c.Address())
-	propBal, _ := propData.Balance(ch.Params().Parts, c.Address())
+	curBal, _ := curData.Balance(ch.Params().Parts, c.WalletAddress())
+	propBal, _ := propData.Balance(ch.Params().Parts, c.WalletAddress())
 	// curPeerBal, _ := curData.Balance(ch.Params().Parts, peer)
 	propPeerBal, _ := propData.Balance(ch.Params().Parts, peer)
 
@@ -129,14 +125,13 @@ func (c *Client) HandleUpdate(update client.ChannelUpdate, responder *client.Upd
 	if err != nil {
 		log.Panicf("Failed to accept channel update: %v", err)
 	}
-	ch.state = update.State.Clone()
+	ch.state = next.State.Clone()
 }
 
-func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
+// HandleAdjudicatorEvent handles adjudicator events.
+func (c *AppClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 	switch e := e.(type) {
 	case *channel.ConcludedEvent:
-		c.mu.Lock()
-		defer c.mu.Unlock()
 
 		p, ch, ok := c.peerWithChannelForChannelID(e.ID())
 		if !ok {
@@ -148,7 +143,7 @@ func (c *Client) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 	}
 }
 
-func (c *Client) peerWithChannelForChannelID(cID channel.ID) (common.Address, *Channel, bool) {
+func (c *AppClient) peerWithChannelForChannelID(cID channel.ID) (common.Address, *Channel, bool) {
 	for p, ch := range c.channels {
 		if ch.ID() == cID {
 			return p, ch, true
@@ -157,7 +152,7 @@ func (c *Client) peerWithChannelForChannelID(cID channel.ID) (common.Address, *C
 	return common.Address{}, nil, false
 }
 
-func (c *Client) hasCollateralOverdrawnEvents(peer common.Address) (bool, error) {
+func (c *AppClient) hasCollateralOverdrawnEvents(peer common.Address) (bool, error) {
 	it, err := c.assetHolder.FilterCollateralOverdrawn(nil, []common.Address{peer})
 	if err != nil {
 		return false, errors.WithMessage(err, "creating filter")

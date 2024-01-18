@@ -22,54 +22,59 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	ethchannel "github.com/perun-network/perun-eth-backend/channel"
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
 	"github.com/pkg/errors"
-	ewallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/channel"
-	"perun.network/go-perun/wallet"
 	"perun.network/perun-collateralized-channels/app"
 )
 
-func zeroBalance(asset common.Address) *channel.Allocation {
-	return &channel.Allocation{
-		Assets:   []channel.Asset{ewallet.AsWalletAddr(asset)},
-		Balances: [][]*big.Int{{big.NewInt(0), big.NewInt(0)}},
-	}
+func zeroBalance(asset channel.Asset) *channel.Allocation {
+	initAlloc := channel.NewAllocation(2, asset)
+	initAlloc.SetAssetBalances(asset, []channel.Bal{
+		big.NewInt(0), // Our initial balance.
+		big.NewInt(0), // Peer's initial balance.
+	})
+	return initAlloc
 }
 
-func (c *Client) PerunAddress() wallet.Address {
-	return c.perunClient.Account.Address()
+// WalletAddress returns the wallet address of the client.
+func (c *AppClient) WalletAddress() common.Address {
+	return common.Address(*c.account.(*ethwallet.Address))
 }
 
-func (c *Client) Address() common.Address {
-	return c.perunClient.Account.EthAddress()
-}
-
-func (c *Client) defaultContext() context.Context {
+func (c *AppClient) defaultContext() context.Context {
 	ctx, _ := context.WithTimeout(context.Background(), c.contextTimeout)
 	return ctx
 }
 
-func (c *Client) settle(ch *Channel) (err error) {
-	err = ch.UpdateBy(c.defaultContext(), func(s *channel.State) error {
-		s.IsFinal = true
-		return nil
-	})
-	if err != nil {
-		return errors.WithMessage(err, "final update")
-	}
-
-	err = ch.Register(c.defaultContext())
-	if err != nil {
-		return errors.WithMessage(err, "registering")
+func (c *AppClient) settle(ch *Channel) (err error) {
+	// Finalize the channel to enable fast settlement.
+	if !ch.State().IsFinal {
+		err := ch.Update(context.TODO(), func(state *channel.State) {
+			state.IsFinal = true
+		})
+		if err != nil {
+			return errors.WithMessage(err, "final update")
+		}
 	}
 
 	err = ch.Settle(c.defaultContext(), false)
-	return errors.WithMessage(err, "settling channel")
+	if err != nil {
+		return errors.WithMessage(err, "settling channel")
+
+	}
+
+	return ch.Close()
 }
 
-func (ch *Channel) UpdateBy(ctx context.Context, update func(s *channel.State) error) error {
-	err := ch.Channel.UpdateBy(ctx, update)
+// Update updates the channel state and the internal state.
+func (ch *Channel) Update(ctx context.Context, update func(s *channel.State)) error {
+	err := ch.Channel.Update(ctx, update)
 	if err != nil {
 		return err
 	}
@@ -77,39 +82,41 @@ func (ch *Channel) UpdateBy(ctx context.Context, update func(s *channel.State) e
 	return nil
 }
 
-func (c *Client) Logf(format string, v ...interface{}) {
-	log.Printf("Client %v: %v", c.Address(), fmt.Sprintf(format, v...))
+// Logf logs a message with the client's address.
+func (c *AppClient) Logf(format string, v ...interface{}) {
+	log.Printf("Client %v: %v", c.WalletAddress(), fmt.Sprintf(format, v...))
 }
 
-func (c *Client) OnChainBalance() (b *big.Int, err error) {
-	return c.perunClient.EthClient.BalanceAt(c.defaultContext(), c.Address(), nil)
+// OnChainBalance returns the on-chain balance of the client.
+func (c *AppClient) OnChainBalance() (b *big.Int, err error) {
+	return c.ethClient.BalanceAt(c.defaultContext(), c.WalletAddress(), nil)
 }
 
-func (c *Client) PeerCollateral() (b *big.Int, err error) {
-	return c.peerCollateral(c.Address())
+// PeerCollateral returns the collateral of the peer.
+func (c *AppClient) PeerCollateral() (b *big.Int, err error) {
+	return c.peerCollateral(c.WalletAddress())
 }
 
-func (c *Client) peerCollateral(peer common.Address) (b *big.Int, err error) {
+func (c *AppClient) peerCollateral(peer common.Address) (b *big.Int, err error) {
 	b, err = c.assetHolder.Holdings(nil, calcPeerCollateralID(peer))
 	return b, errors.WithMessage(err, "reading peer collateral")
 }
 
-func (c *Client) ChannelFunding(peer common.Address) (b *big.Int, err error) {
+// ChannelFunding returns the channel funding of the peer.
+func (c *AppClient) ChannelFunding(peer common.Address) (b *big.Int, err error) {
 	ch, ok := c.channels[peer]
 	if !ok {
 		return nil, errors.New("channel not found")
 	}
-	b, err = c.assetHolder.Holdings(nil, calcChannelCollateralID(ch.ID(), c.Address()))
+	b, err = c.assetHolder.Holdings(nil, calcChannelCollateralID(ch.ID(), c.WalletAddress()))
 	return b, errors.WithMessage(err, "reading peer collateral")
 }
 
-func (c *Client) ChannelBalances() (balances map[common.Address]*big.Int, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+// ChannelBalances returns the channel balances of the client.
+func (c *AppClient) ChannelBalances() (balances map[common.Address]*big.Int, err error) {
 	balances = make(map[common.Address]*big.Int)
 	for p, ch := range c.channels {
-		bal, err := app.ChannelBalance(ch.Params().Parts, ch.State().Data, c.Address())
+		bal, err := app.ChannelBalance(ch.Params().Parts, ch.State().Data, c.WalletAddress())
 		if err != nil {
 			return nil, errors.WithMessagef(err, "reading channel balance: %v", ch)
 		}
@@ -144,4 +151,20 @@ func calcChannelCollateralID(channelID channel.ID, peer common.Address) [32]byte
 		log.Panicf("failed to encode peer address: %v", err)
 	}
 	return crypto.Keccak256Hash(bytes)
+}
+
+// CreateContractBackend creates a new contract backend.
+func CreateContractBackend(
+	nodeURL string,
+	chainID uint64,
+	wallet *swallet.Wallet,
+) (*ethclient.Client, ethchannel.ContractBackend, *swallet.Transactor, error) {
+	signer := types.LatestSignerForChainID(new(big.Int).SetUint64(chainID))
+	transactor := swallet.NewTransactor(wallet, signer)
+	client, err := ethclient.Dial(nodeURL)
+	if err != nil {
+		return nil, ethchannel.ContractBackend{}, nil, nil
+	}
+
+	return client, ethchannel.NewContractBackend(client, ethchannel.MakeChainID(big.NewInt(int64(chainID))), transactor, txFinalityDepth), transactor, nil
 }
