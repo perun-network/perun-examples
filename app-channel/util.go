@@ -20,7 +20,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 
 	"perun.network/perun-examples/app-channel/app"
 	"perun.network/perun-examples/app-channel/contracts/generated/ticTacToeApp"
@@ -29,8 +28,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	ethchannel "perun.network/go-perun/backend/ethereum/channel"
-	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	ethchannel "github.com/perun-network/perun-eth-backend/channel"
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/client"
@@ -61,7 +61,7 @@ func deployContracts(nodeURL string, chainID uint64, privateKey string) (adj, ah
 		panic(err)
 	}
 
-	const gasLimit = 1100000  // Must be sufficient for deploying TicTacToe.sol.
+	const gasLimit = 2200000 // Must be sufficient for deploying TicTacToeApp.sol.
 	tops, err := cb.NewTransactor(context.TODO(), gasLimit, acc)
 	if err != nil {
 		panic(err)
@@ -97,12 +97,14 @@ func setupGameClient(
 	}
 	w := swallet.NewWallet(k)
 	acc := crypto.PubkeyToAddress(k.PublicKey)
+	eaddr := ethwallet.AsWalletAddr(acc)
 
 	// Create and start client.
 	c, err := client.SetupAppClient(
 		bus,
 		w,
 		acc,
+		eaddr,
 		nodeURL,
 		chainID,
 		adjudicator,

@@ -14,8 +14,7 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-pragma solidity ^0.7.0;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.0;
 
 import "./perun-eth-contracts/contracts/App.sol";
 
@@ -71,7 +70,7 @@ contract TicTacToeApp is App {
         // Test final state.
         (bool isFinal, bool hasWinner, uint8 winner) = checkFinal(to.appData);
         require(to.isFinal == isFinal, "final flag");
-        Array.requireEqualAddressArray(to.outcome.assets, from.outcome.assets);
+        Channel.requireEqualAssetArray(to.outcome.assets, from.outcome.assets);
         Channel.requireEqualSubAllocArray(to.outcome.locked, from.outcome.locked);
         uint256[][] memory expectedBalances = from.outcome.balances;
         if (hasWinner) {

@@ -21,13 +21,16 @@ func newTicTacToeChannel(ch *client.Channel) *TicTacToeChannel {
 
 // Set sends a game move to the channel peer.
 func (g *TicTacToeChannel) Set(x, y int) {
-	err := g.ch.UpdateBy(context.TODO(), func(state *channel.State) error {
+	err := g.ch.Update(context.TODO(), func(state *channel.State) {
 		app, ok := state.App.(*app.TicTacToeApp)
 		if !ok {
-			return fmt.Errorf("invalid app type: %T", app)
+			panic(fmt.Errorf("invalid app type: %T", app))
 		}
 
-		return app.Set(state, x, y, g.ch.Idx())
+		err := app.Set(state, x, y, g.ch.Idx())
+		if err != nil {
+			panic(err)
+		}
 	})
 	if err != nil {
 		panic(err) // We panic on error to keep the code simple.

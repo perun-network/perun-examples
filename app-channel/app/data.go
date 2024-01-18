@@ -28,6 +28,27 @@ func (d *TicTacToeAppData) String() string {
 	return b.String()
 }
 
+func (d *TicTacToeAppData) MarshalBinary() ([]byte, error) {
+	var b bytes.Buffer
+	err := d.Encode(&b)
+	return b.Bytes(), err
+}
+
+func (d *TicTacToeAppData) UnmarshalBinary(data []byte) error {
+	var err error
+	buffer := bytes.NewBuffer(data)
+	d.NextActor, err = readUInt8(buffer)
+	if err != nil {
+		return errors.WithMessage(err, "reading actor")
+	}
+	grid, err := readUInt8Array(buffer, len(d.Grid))
+	if err != nil {
+		return errors.WithMessage(err, "reading grid")
+	}
+	copy(d.Grid[:], makeFieldValueArray(grid))
+	return nil
+}
+
 // Encode encodes app data onto an io.Writer.
 func (d *TicTacToeAppData) Encode(w io.Writer) error {
 	err := writeUInt8(w, d.NextActor)
