@@ -15,20 +15,21 @@
 package client
 
 import (
-	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	"math/big"
+
+	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
 )
 
 // WalletAddress returns the wallet address of the client.
 func (c *PaymentClient) WalletAddress() wallet.Address {
-	return c.account
+	return c.account.Address()
 }
 
 // WireAddress returns the wire address of the client.
 func (c *PaymentClient) WireAddress() wire.Address {
-	return c.account
+	return c.waddress
 }
 
 // DotToPlanck converts a given amount in Dot to Planck.

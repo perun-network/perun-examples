@@ -15,13 +15,14 @@
 package main
 
 import (
-	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/perun-network/perun-polkadot-backend/pkg/sr25519"
 	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	"perun.network/go-perun/wallet"
 
-	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"log"
+
+	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
@@ -30,7 +31,7 @@ import (
 func setupPaymentClient(
 	bus wire.Bus,
 	nodeURL string,
-	networkId dot.NetworkID,
+	networkID dot.NetworkID,
 	queryDepth types.BlockNumber,
 	privateKey string,
 ) *client.PaymentClient {
@@ -48,7 +49,7 @@ func setupPaymentClient(
 		w,
 		acc,
 		nodeURL,
-		networkId,
+		networkID,
 		queryDepth,
 	)
 	if err != nil {
@@ -64,8 +65,8 @@ type balanceLogger struct {
 }
 
 // newBalanceLogger creates a new balance logger for the specified ledger.
-func newBalanceLogger(nodeURL string, networkId dot.NetworkID) balanceLogger {
-	api, err := dot.NewAPI(nodeURL, networkId)
+func newBalanceLogger(nodeURL string, networkID dot.NetworkID) balanceLogger {
+	api, err := dot.NewAPI(nodeURL, networkID)
 	if err != nil {
 		panic(err)
 	}
