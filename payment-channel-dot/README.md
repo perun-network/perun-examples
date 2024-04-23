@@ -4,18 +4,10 @@ This demo connects to our [Pallet] that runs on a [Polkadot Node] by using our [
 
 ## Example Walkthrough
 
-In another terminal, clone and start a local [Polkadot Node]: 
-
-**WARNING**: only working with a newer version of Polkadot Node from branch `update_substrate`
-
-To build the Polkadot Node, you need [Rust Developer Environment].
+In another terminal, start a local development [Polkadot Node]: 
 
 ```sh
-git clone git@github.com:perun-network/perun-polkadot-node.git
-
-cd perun-polkadot-node/node
-
-cargo run --release -- --dev --tmp
+docker run --rm -it -p 9944:9944 ghcr.io/perun-network/polkadot-test-node:0.4.0
 ```
 
 Wait around 10 seconds for the Node to start-up.

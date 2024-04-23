@@ -2,8 +2,6 @@ module perun.network/perun-examples/payment-channel
 
 go 1.21
 
-toolchain go1.21.4
-
 require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.1
 	github.com/perun-network/perun-polkadot-backend v0.2.1-0.20240411100708-029d9632b748
