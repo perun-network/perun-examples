@@ -34,12 +34,12 @@ func (c *PaymentClient) WireAddress() wire.Address {
 
 // DotToPlanck converts a given amount in Dot to Planck.
 func DotToPlanck(d *big.Float) *big.Int {
-	plankFloat := new(big.Float).Mul(d, new(big.Float).SetFloat64(dot.PlankPerDot))
+	plankFloat := new(big.Float).Mul(d, new(big.Float).SetFloat64(dot.PlanckPerDot))
 	plank, _ := plankFloat.Int(nil)
 	return plank
 }
 
 // PlanckToDot converts a given amount in Planck to Dot.
 func PlanckToDot(d *big.Int) *dot.Dot {
-	return dot.NewDotFromPlank(d)
+	return dot.NewDotFromPlanck(d)
 }
