@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/nervosnetwork/ckb-sdk-go/v2/types"
+	"github.com/perun-network/perun-libp2p-wire/p2p"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence/keyvalue"
-	"perun.network/go-perun/wire"
 	"perun.network/perun-ckb-backend/channel/asset"
 	"perun.network/perun-ckb-backend/wallet"
 	"perun.network/perun-ckb-demo/client"
@@ -70,35 +72,57 @@ func main() {
 		log.Fatalf("error adding bob's account: %v", err)
 	}
 
+	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	aliceNet, err := p2p.NewP2PBus(aliceWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net", err)
+	}
+	aliceBus := aliceNet.Bus
+	aliceListener := aliceNet.Listener
+	go aliceBus.Listen(aliceListener)
+
 	// Setup clients.
 	log.Println("Setting up clients.")
-	bus := wire.NewLocalBus() // Message bus used for off-chain communication.
+	//bus := wire.NewLocalBus() // Message bus used for off-chain communication.
 	prAlice := keyvalue.NewPersistRestorer(memorydb.NewDatabase())
-	prBob := keyvalue.NewPersistRestorer(memorydb.NewDatabase())
+
 	alice, err := client.NewPaymentClient(
 		"Alice",
 		Network,
 		d,
-		bus,
 		rpcNodeURL,
 		aliceAccount,
 		*keyAlice,
 		w,
 		prAlice,
+		aliceWireAcc.Address(),
+		aliceNet,
 	)
 	if err != nil {
 		log.Fatalf("error creating alice's client: %v", err)
 	}
+
+	prBob := keyvalue.NewPersistRestorer(memorydb.NewDatabase())
+	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	bobNet, err := p2p.NewP2PBus(bobWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net", err)
+	}
+	bobBus := bobNet.Bus
+	bobListener := bobNet.Listener
+	go bobBus.Listen(bobListener)
+
 	bob, err := client.NewPaymentClient(
 		"Bob",
 		Network,
 		d,
-		bus,
 		rpcNodeURL,
 		bobAccount,
 		*keyBob,
 		w,
 		prBob,
+		bobWireAcc.Address(),
+		bobNet,
 	)
 	if err != nil {
 		log.Fatalf("error creating bob's client: %v", err)
@@ -127,7 +151,7 @@ func main() {
 	*/
 
 	fmt.Println("Opening channel and depositing funds")
-	chAlice := alice.OpenChannel(bob.WireAddress(), map[channel.Asset]float64{
+	chAlice := alice.OpenChannel(bob.WireAddress(), bob.PeerID(), map[channel.Asset]float64{
 		&asset.Asset{
 			IsCKBytes: true,
 			SUDT:      nil,
@@ -184,12 +208,13 @@ func main() {
 		"Alice",
 		Network,
 		d,
-		bus,
 		rpcNodeURL,
 		aliceAccount,
 		*keyAlice,
 		w,
 		prAlice,
+		alice.WireAddress(),
+		aliceNet,
 	)
 	if err != nil {
 		log.Fatalf("error creating alice's client: %v", err)
@@ -198,19 +223,21 @@ func main() {
 		"Bob",
 		Network,
 		d,
-		bus,
 		rpcNodeURL,
 		bobAccount,
 		*keyBob,
 		w,
 		prBob,
+		bob.WireAddress(),
+		bobNet,
 	)
 	if err != nil {
 		log.Fatalf("error creating bob's client: %v", err)
 	}
-
-	chansAlice := alice2.Restore()
-	chansBob := bob2.Restore()
+	fmt.Println("Starting restoring channels")
+	chansAlice := alice2.Restore(bob2.WireAddress(), bob2.PeerID())
+	fmt.Println("Alice's channel restored")
+	chansBob := bob2.Restore(alice2.WireAddress(), alice2.PeerID())
 	fmt.Println("Alice and Bob's channels successfully restored")
 
 	// Print balances after transactions.

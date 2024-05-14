@@ -9,6 +9,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/nervosnetwork/ckb-sdk-go/v2/rpc"
 	"github.com/nervosnetwork/ckb-sdk-go/v2/types"
+	"github.com/perun-network/perun-libp2p-wire/p2p"
 	"perun.network/go-perun/channel"
 	gpchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence"
@@ -16,7 +17,6 @@ import (
 	gpwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"perun.network/go-perun/wire/net/simple"
 	"perun.network/perun-ckb-backend/backend"
 	"perun.network/perun-ckb-backend/channel/adjudicator"
 	"perun.network/perun-ckb-backend/channel/asset"
@@ -36,21 +36,23 @@ type PaymentClient struct {
 	wAddr        wire.Address
 	Network      types.Network
 	PerunClient  *client.Client
-
-	channels  chan *PaymentChannel
-	rpcClient rpc.Client
+	net          *p2p.Net
+	channels     chan *PaymentChannel
+	rpcClient    rpc.Client
 }
 
 func NewPaymentClient(
 	name string,
 	network types.Network,
 	deployment backend.Deployment,
-	bus wire.Bus,
 	rpcUrl string,
 	account *wallet.Account,
 	key secp256k1.PrivateKey,
 	wallet *wallet.EphemeralWallet,
 	persistRestorer persistence.PersistRestorer,
+	wAddr wire.Address,
+	net *p2p.Net,
+
 ) (*PaymentClient, error) {
 	backendRPCClient, err := rpc.Dial(rpcUrl)
 	if err != nil {
@@ -68,8 +70,19 @@ func NewPaymentClient(
 	if err != nil {
 		return nil, err
 	}
-	wAddr := simple.NewAddress(account.Address().String())
-	perunClient, err := client.New(wAddr, bus, f, a, wallet, watcher)
+	/*
+		wireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+		net, err := p2p.NewP2PBus(wireAcc)
+		if err != nil {
+			panic(errors.Wrap(err, "creating p2p net"))
+		}
+		bus := net.Bus
+		listener := net.Listener
+
+		//wAddr := simple.NewAddress(account.Address().String())
+		wAddr := wireAcc.Address()
+	*/
+	perunClient, err := client.New(wAddr, net.Bus, f, a, wallet, watcher)
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +102,7 @@ func NewPaymentClient(
 		PerunClient: perunClient,
 		channels:    make(chan *PaymentChannel, 1),
 		rpcClient:   balanceRPC,
+		net:         net,
 	}
 
 	//go p.PollBalances()
@@ -103,6 +117,11 @@ func (p *PaymentClient) WalletAddress() gpwallet.Address {
 
 func (p *PaymentClient) WireAddress() wire.Address {
 	return p.wAddr
+}
+
+func (p *PaymentClient) PeerID() string {
+	walletAddr := p.wAddr.(*p2p.Address)
+	return walletAddr.ID.String()
 }
 
 func (p *PaymentClient) GetSudtBalance() *big.Int {
@@ -126,12 +145,13 @@ func (p *PaymentClient) GetBalances() string {
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (p *PaymentClient) OpenChannel(peer wire.Address, amounts map[gpchannel.Asset]float64) *PaymentChannel {
+func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts map[gpchannel.Asset]float64) *PaymentChannel {
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 	log.Println("OpenChannel called")
 	participants := []wire.Address{p.WireAddress(), peer}
+	p.net.Dialer.Register(peer, peerID)
 
 	assets := make([]gpchannel.Asset, len(amounts))
 	i := 0
@@ -214,22 +234,11 @@ func (p *PaymentClient) Shutdown() {
 	p.PerunClient.Close()
 }
 
-func (c *PaymentClient) Restore() []*PaymentChannel {
+func (c *PaymentClient) Restore(peer wire.Address, peerID string) []*PaymentChannel {
 	var restoredChannels []*client.Channel
-
+	//c.net.Dialer.Register(peer, peerID)
 	//TODO: Remove this hack. Find why asset is not found upon restoring
 	c.PerunClient.OnNewChannel(func(ch *client.Channel) {
-		/*
-			state := ch.State().Clone()
-			ckbyte := asset.Asset{
-				IsCKBytes: true,
-				SUDT:      nil,
-			}
-			//create a new allocation where asset type is defined
-			alloc := gpchannel.NewAllocation(2, ckbyte)
-			ckbBalances := state.Allocation.Balances[0]
-			alloc.SetAssetBalances(ckbyte, ckbBalances)
-		*/
 		restoredChannels = append(restoredChannels, ch)
 	})
 
