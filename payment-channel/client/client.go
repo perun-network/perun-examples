@@ -17,20 +17,20 @@ package client
 import (
 	"context"
 	"fmt"
-	"math/big"
-
-	ethchannel "perun.network/go-perun/backend/ethereum/channel"
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
-	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
-	"perun.network/go-perun/channel"
-	"perun.network/go-perun/client"
-	"perun.network/go-perun/wallet"
-	"perun.network/go-perun/watcher/local"
-	"perun.network/go-perun/wire"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"math/big"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	"perun.network/go-perun/channel/persistence"
+	"perun.network/go-perun/watcher/local"
+
+	"perun.network/go-perun/channel"
+	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire"
 )
 
 const (
@@ -54,6 +54,7 @@ func SetupPaymentClient(
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
 	asset ethwallet.Address, // asset is the address of the asset holder for our payment channels.
+	pr persistence.PersistRestorer,
 ) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -74,11 +75,11 @@ func SetupPaymentClient(
 	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
 	dep := ethchannel.NewETHDepositor()
-	ethAcc := accounts.Account{Address: acc}
+	ethAcc := accounts.Account{Address: acc} // Account to be used for funding transactions
 	funder.RegisterAsset(asset, dep, ethAcc)
 
 	// Setup adjudicator.
-	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc) // acc is the address of the account that will receive the payout
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
@@ -89,6 +90,7 @@ func SetupPaymentClient(
 	// Setup Perun client.
 	waddr := ethwallet.AsWalletAddr(acc)
 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	perunClient.EnablePersistence(pr)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
@@ -161,4 +163,24 @@ func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
 // Shutdown gracefully shuts down the client.
 func (c *PaymentClient) Shutdown() {
 	c.perunClient.Close()
+}
+
+func (c *PaymentClient) Restore() []*PaymentChannel {
+	var restoredChannels []*client.Channel
+
+	c.perunClient.OnNewChannel(func(ch *client.Channel) {
+		restoredChannels = append(restoredChannels, ch)
+	})
+
+	err := c.perunClient.Restore(context.TODO())
+	if err != nil {
+		fmt.Println("Error restoring channels")
+	}
+
+	paymentChannels := make([]*PaymentChannel, len(restoredChannels))
+	for i, ch := range restoredChannels {
+		paymentChannels[i] = newPaymentChannel(ch, c.currency)
+	}
+
+	return paymentChannels
 }
