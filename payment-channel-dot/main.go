@@ -16,13 +16,14 @@ package main
 
 import (
 	"log"
+
 	"perun.network/go-perun/wire"
 )
 
 const (
 	chainURL        = "ws://127.0.0.1:9944"
 	networkID       = 42
-	blockQueryDepth = 100
+	blockQueryDepth = 10
 
 	// Private keys.
 	keyAlice = "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
@@ -54,8 +55,8 @@ func main() {
 	chAlice.SendPayment(25000)
 
 	log.Println("Settling channel.")
-	chAlice.Settle() // Conclude and withdraw.
-	chBob.Settle()   // Withdraw.
+	chAlice.Settle(false) // Conclude and withdraw.
+	chBob.Settle(false)   // Withdraw.
 
 	// Print balances after transactions.
 	l.LogBalances(alice.WalletAddress(), bob.WalletAddress())
@@ -63,4 +64,6 @@ func main() {
 	// Cleanup.
 	alice.Shutdown()
 	bob.Shutdown()
+
+	log.Println("Done.")
 }

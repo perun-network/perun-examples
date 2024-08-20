@@ -17,10 +17,13 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/big"
 
-	ethchannel "perun.network/go-perun/backend/ethereum/channel"
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
-	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
+	ethchannel "github.com/perun-network/perun-eth-backend/channel"
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
+	ethwire "github.com/perun-network/perun-eth-backend/wire"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
@@ -39,8 +42,9 @@ const (
 
 // AppClient is an app channel client.
 type AppClient struct {
-	perunClient *client.Client    // The core Perun client.
-	account     wallet.Address    // The account we use for on-chain and off-chain transactions.
+	perunClient *client.Client // The core Perun client.
+	account     wallet.Address // The account we use for on-chain and off-chain transactions.
+	waddress    wire.Address
 	currency    channel.Asset     // The currency we expect to get paid in.
 	stake       channel.Bal       // The amount we put at stake.
 	app         *app.TicTacToeApp // The app definition.
@@ -52,10 +56,11 @@ func SetupAppClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
 	acc common.Address, // acc is the address of the account to be used for signing transactions.
+	eaddress *ethwallet.Address, // eaddress is the address of the Ethereum account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
-	asset ethwallet.Address, // asset is the address of the asset holder for our app channels.
+	assetaddr ethwallet.Address, // asset is the address of the asset holder for our app channels.
 	app *app.TicTacToeApp, // app is the channel app we want to set up the client with.
 	stake channel.Bal, // stake is the balance the client is willing to fund the channel with.
 ) (*AppClient, error) {
@@ -70,7 +75,7 @@ func SetupAppClient(
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
-	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(asset), adjudicator)
+	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(assetaddr), adjudicator)
 	if err != nil {
 		return nil, fmt.Errorf("validating adjudicator: %w", err)
 	}
@@ -79,7 +84,8 @@ func SetupAppClient(
 	funder := ethchannel.NewFunder(cb)
 	dep := ethchannel.NewETHDepositor()
 	ethAcc := accounts.Account{Address: acc}
-	funder.RegisterAsset(asset, dep, ethAcc)
+	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
+	funder.RegisterAsset(*asset, dep, ethAcc)
 
 	// Setup adjudicator.
 	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
@@ -91,7 +97,7 @@ func SetupAppClient(
 	}
 
 	// Setup Perun client.
-	waddr := ethwallet.AsWalletAddr(acc)
+	waddr := &ethwire.Address{Address: eaddress}
 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
@@ -100,8 +106,9 @@ func SetupAppClient(
 	// Create client and start request handler.
 	c := &AppClient{
 		perunClient: perunClient,
-		account:     waddr,
-		currency:    &asset,
+		account:     eaddress,
+		waddress:    waddr,
+		currency:    asset,
 		stake:       stake,
 		app:         app,
 		channels:    make(chan *TicTacToeChannel, 1),
@@ -115,7 +122,7 @@ func SetupAppClient(
 
 // OpenAppChannel opens a new app channel with the specified peer.
 func (c *AppClient) OpenAppChannel(peer wire.Address) *TicTacToeChannel {
-	participants := []wire.Address{c.account, peer}
+	participants := []wire.Address{c.waddress, peer}
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := channel.NewAllocation(2, c.currency)

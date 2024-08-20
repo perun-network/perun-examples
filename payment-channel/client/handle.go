@@ -19,31 +19,30 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
 
 // HandleProposal is the callback for incoming channel proposals.
 func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.ProposalResponder) {
-	lcp, err := func() (*client.LedgerChannelProposal, error) {
+	lcp, err := func() (*client.LedgerChannelProposalMsg, error) {
 		// Ensure that we got a ledger channel proposal.
-		lcp, ok := p.(*client.LedgerChannelProposal)
+		lcp, ok := p.(*client.LedgerChannelProposalMsg)
 		if !ok {
-			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
+			return nil, fmt.Errorf("invalid proposal type: %T", p)
 		}
 
 		// Check that we have the correct number of participants.
 		if lcp.NumPeers() != 2 {
-			return nil, fmt.Errorf("Invalid number of participants: %d", lcp.NumPeers())
+			return nil, fmt.Errorf("invalid number of participants: %d", lcp.NumPeers())
 		}
 
 		// Check that the channel has the expected assets and funding balances.
 		const assetIdx, peerIdx = 0, 1
-		if err := channel.AssetsAssertEqual(lcp.InitBals.Assets, []channel.Asset{c.currency}); err != nil {
-			return nil, fmt.Errorf("Invalid assets: %v\n", err)
+		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, []channel.Asset{c.currency}); err != nil {
+			return nil, fmt.Errorf("invalid assets: %v", err)
 		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 {
-			return nil, fmt.Errorf("Invalid funding balance")
+			return nil, fmt.Errorf("invalid funding balance")
 		}
 		return lcp, nil
 	}()
@@ -73,16 +72,16 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpdate, r *client.UpdateResponder) {
 	// We accept every update that increases our balance.
 	err := func() error {
-		err := channel.AssetsAssertEqual(cur.Assets, next.State.Assets)
+		err := channel.AssertAssetsEqual(cur.Assets, next.State.Assets)
 		if err != nil {
-			return fmt.Errorf("Invalid assets: %v", err)
+			return fmt.Errorf("invalid assets: %v", err)
 		}
 
 		receiverIdx := 1 - next.ActorIdx // This works because we are in a two-party channel.
 		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
 		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
 		if nextBal.Cmp(curBal) < 0 {
-			return fmt.Errorf("Invalid balance: %v", nextBal)
+			return fmt.Errorf("invalid balance: %v", nextBal)
 		}
 		return nil
 	}()

@@ -1,12 +1,12 @@
 module perun.network/perun-examples/multiledger-channel
 
-go 1.17
+go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/perun-network/perun-eth-backend v0.1.0
 	github.com/pkg/errors v0.9.1
-	perun.network/go-perun v0.10.5
+	perun.network/go-perun v0.10.6
 )
 
 require (
@@ -16,7 +16,7 @@ require (
 	github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
-	github.com/google/uuid v1.1.5 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
