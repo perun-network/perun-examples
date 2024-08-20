@@ -6,7 +6,7 @@ require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.1
 	github.com/perun-network/perun-polkadot-backend v0.2.1-0.20240425071359-589d0ae7df6d
 	github.com/pkg/errors v0.9.1
-	perun.network/go-perun v0.10.6
+	perun.network/go-perun v0.11.0
 )
 
 require (

@@ -35,6 +35,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const gasLimit = 500000
+
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
 	perunClient *client.Client // The core Perun client.
@@ -73,13 +75,13 @@ func SetupPaymentClient(
 
 	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
-	dep := ethchannel.NewETHDepositor()
+	dep := ethchannel.NewETHDepositor(gasLimit)
 	ethAcc := accounts.Account{Address: acc}
 	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
 	funder.RegisterAsset(*asset, dep, ethAcc)
 
 	// Setup adjudicator.
-	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc, gasLimit)
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)

@@ -38,6 +38,7 @@ import (
 
 const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
+	gasLimit        = 500000
 )
 
 // AppClient is an app channel client.
@@ -82,13 +83,13 @@ func SetupAppClient(
 
 	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
-	dep := ethchannel.NewETHDepositor()
+	dep := ethchannel.NewETHDepositor(gasLimit)
 	ethAcc := accounts.Account{Address: acc}
 	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
 	funder.RegisterAsset(*asset, dep, ethAcc)
 
 	// Setup adjudicator.
-	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc, gasLimit)
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
