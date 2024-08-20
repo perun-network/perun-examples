@@ -15,18 +15,15 @@
 package client
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	ethchannel "github.com/perun-network/perun-eth-backend/channel"
-	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
-	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
-	"math/big"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wire"
-)
-
-const (
-	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
 )
 
 // CreateContractBackend creates a new contract backend.
@@ -35,7 +32,7 @@ func CreateContractBackend(
 	chainID uint64,
 	w *swallet.Wallet,
 ) (ethchannel.ContractBackend, error) {
-	signer := types.LatestSignerForChainID(new(big.Int).SetUint64(chainID))
+	signer := types.NewEIP155Signer(new(big.Int).SetUint64(chainID))
 	transactor := swallet.NewTransactor(w, signer)
 
 	ethClient, err := ethclient.Dial(nodeURL)
@@ -43,7 +40,7 @@ func CreateContractBackend(
 		return ethchannel.ContractBackend{}, err
 	}
 
-	return ethchannel.NewContractBackend(ethClient, ethchannel.MakeChainID(big.NewInt(int64(chainID))), transactor, txFinalityDepth), nil
+	return ethchannel.NewContractBackend(ethClient, transactor, txFinalityDepth), nil
 }
 
 // WalletAddress returns the wallet address of the client.
@@ -53,7 +50,7 @@ func (c *PaymentClient) WalletAddress() common.Address {
 
 // WireAddress returns the wire address of the client.
 func (c *PaymentClient) WireAddress() wire.Address {
-	return c.waddress
+	return c.account
 }
 
 // EthToWei converts a given amount in ETH to Wei.

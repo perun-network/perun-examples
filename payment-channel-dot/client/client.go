@@ -17,13 +17,12 @@ package client
 import (
 	"context"
 	"fmt"
-	"math/big"
-
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	dotchannel "github.com/perun-network/perun-polkadot-backend/channel"
 	"github.com/perun-network/perun-polkadot-backend/channel/pallet"
 	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
+	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
@@ -36,9 +35,8 @@ import (
 
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
-	perunClient *client.Client // The core Perun client.
-	account     wallet.Account // The account we use for on-chain and off-chain transactions.
-	waddress    wire.Address
+	perunClient *client.Client       // The core Perun client.
+	account     wallet.Address       // The account we use for on-chain and off-chain transactions.
 	currency    channel.Asset        // The currency we expect to get paid in.
 	channels    chan *PaymentChannel // Accepted payment channels.
 }
@@ -49,11 +47,11 @@ func SetupPaymentClient(
 	w *dotwallet.Wallet, // w is the wallet used to resolve addresses to accounts for channels.
 	acc wallet.Account, // acc is the account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
-	networkID dot.NetworkID, // networkId is the identifier of the blockchain.
+	networkId dot.NetworkID, // networkId is the identifier of the blockchain.
 	queryDepth types.BlockNumber, // queryDepth is the number of blocks being evaluated when looking for events.
 ) (*PaymentClient, error) {
 	// Connect to backend.
-	api, err := dot.NewAPI(nodeURL, networkID)
+	api, err := dot.NewAPI(nodeURL, networkId)
 	if err != nil {
 		panic(err)
 	}
@@ -70,8 +68,7 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	waddr := &Address{Address: dotwallet.AsAddr(acc.Address())}
-
+	waddr := dotwallet.AsAddr(acc.Address())
 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
@@ -80,9 +77,8 @@ func SetupPaymentClient(
 	// Create client and start request handler.
 	c := &PaymentClient{
 		perunClient: perunClient,
-		account:     acc,
-		waddress:    waddr,
-		currency:    dotchannel.Asset,
+		account:     waddr,
+		currency:    &dotchannel.Asset,
 		channels:    make(chan *PaymentChannel, 1),
 	}
 
@@ -95,7 +91,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentC
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	participants := []wire.Address{c.WireAddress(), peer}
+	participants := []wire.Address{c.account, peer}
 
 	// We create an initial allocation which defines the starting balances.
 	initBal := DotToPlanck(big.NewFloat(amount))
@@ -109,7 +105,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentC
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
-		c.account.Address(),
+		c.account,
 		initAlloc,
 		participants,
 	)

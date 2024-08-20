@@ -16,6 +16,7 @@ package app
 
 import (
 	"io"
+	"math/big"
 
 	"github.com/pkg/errors"
 
@@ -41,21 +42,36 @@ func (a *CollateralApp) Def() wallet.Address {
 	return a.Addr
 }
 
-func (a *CollateralApp) String() string {
-	return "CollateralApp"
-}
-
-func (a *CollateralApp) NewData() channel.Data {
-	return &CollateralAppData{}
-}
-
 // DecodeData decodes the channel data.
 func (a *CollateralApp) DecodeData(r io.Reader) (channel.Data, error) {
 	balances, err := readTupleInt256ArrayArray(r)
 	if err != nil {
 		return nil, errors.WithMessage(err, "reading (int256[][])")
 	}
-	return &CollateralAppData{balances: balances}, nil
+	return CollateralAppData{balances: balances}, nil
+}
+
+// CollateralAppData is the app data struct.
+type CollateralAppData struct {
+	balances [][]*big.Int
+}
+
+// Encode encodes app data onto an io.Writer.
+func (d CollateralAppData) Encode(w io.Writer) (err error) {
+	err = writeTupleInt256ArrayArray(w, d.balances)
+	return errors.WithMessage(err, "writing (int256[][])")
+}
+
+// Clone returns a deep copy of the app data.
+func (d CollateralAppData) Clone() channel.Data {
+	balances := make([][]*big.Int, len(d.balances))
+	for i := range balances {
+		balances[i] = make([]*big.Int, len(d.balances[i]))
+		for j := range balances[i] {
+			balances[i][j] = new(big.Int).Set(d.balances[i][j])
+		}
+	}
+	return CollateralAppData{balances: balances}
 }
 
 // ValidTransition checks that the data of the `to` state is of type Invoice.
@@ -68,7 +84,7 @@ func (a *CollateralApp) ValidTransition(_ *channel.Params, _, to *channel.State,
 
 // ValidInit checks that the initial state is valid.
 func (a *CollateralApp) ValidInit(p *channel.Params, s *channel.State) error {
-	d, ok := s.Data.(*CollateralAppData)
+	d, ok := s.Data.(CollateralAppData)
 	if !ok {
 		return errors.New("failed to cast app data")
 	} else if len(d.balances) != len(s.Assets) {

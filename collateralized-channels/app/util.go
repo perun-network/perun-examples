@@ -18,14 +18,14 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	"github.com/pkg/errors"
+	ewallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 )
 
 func (a *CollateralApp) ZeroBalance() channel.Data {
-	return &CollateralAppData{
+	return CollateralAppData{
 		[][]*big.Int{{big.NewInt(0), big.NewInt(0)}},
 	}
 }
@@ -51,7 +51,7 @@ func Transfer(peers []wallet.Address, s *channel.State, from common.Address, to 
 		return errors.Errorf("unknown address: %v", from)
 	}
 
-	d, ok := s.Data.(*CollateralAppData)
+	d, ok := s.Data.(CollateralAppData)
 	if !ok {
 		return errors.New("invalid type")
 	}
@@ -64,7 +64,7 @@ func Transfer(peers []wallet.Address, s *channel.State, from common.Address, to 
 }
 
 func ChannelBalance(peers []wallet.Address, data channel.Data, account common.Address) (*big.Int, error) {
-	d, ok := data.(*CollateralAppData)
+	d, ok := data.(CollateralAppData)
 	if !ok {
 		return nil, errors.New("invalid type")
 	}
@@ -84,9 +84,9 @@ func (d CollateralAppData) Balance(peers []wallet.Address, account common.Addres
 }
 
 func peerIndex(peers []wallet.Address, addr common.Address) (int, bool) {
-	walletAddr := ethwallet.AsWalletAddr(addr)
+	walletAddr := ewallet.AsWalletAddr(addr)
 	for i, p := range peers {
-		if p.Equal(walletAddr) {
+		if p.Cmp(walletAddr) == 0 {
 			return i, true
 		}
 	}

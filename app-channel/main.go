@@ -17,8 +17,7 @@ package main
 import (
 	"log"
 	"math/big"
-
-	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/app-channel/app"
 	"perun.network/perun-examples/app-channel/client"

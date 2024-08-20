@@ -18,13 +18,14 @@ import (
 	"context"
 	"log"
 	"math/big"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	ethchannel "github.com/perun-network/perun-eth-backend/channel"
-	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
-	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
+	ethchannel "perun.network/go-perun/backend/ethereum/channel"
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	swallet "perun.network/go-perun/backend/ethereum/wallet/simple"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel/client"
 )
@@ -72,14 +73,12 @@ func setupPaymentClient(
 	}
 	w := swallet.NewWallet(k)
 	acc := crypto.PubkeyToAddress(k.PublicKey)
-	eaddr := ethwallet.AsWalletAddr(acc)
 
 	// Create and start client.
 	c, err := client.SetupPaymentClient(
 		bus,
 		w,
 		acc,
-		eaddr,
 		nodeURL,
 		chainID,
 		adjudicator,
