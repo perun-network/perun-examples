@@ -168,8 +168,8 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222/go.mod h1:VyrYX9gd7irzKovcSS6BIIEwPRkP2Wm2m9ufcdFSJ34=
-github.com/perun-network/perun-polkadot-backend v0.2.1-0.20240425071359-589d0ae7df6d h1:XNERW32C3qi24oSPsC7WdRc9VNqWlTQAlgDUiCagsZs=
-github.com/perun-network/perun-polkadot-backend v0.2.1-0.20240425071359-589d0ae7df6d/go.mod h1:cddzrhZ0iFylrhVsGyxdiiPrXwWMLMunoa3AtWfX/Qk=
+github.com/perun-network/perun-polkadot-backend v0.2.1-0.20240822065131-d2dc885d1131 h1:qR0O6AwDXX4qMYcYi4ODootYJz1H6XdpljRZ4Eh6hJo=
+github.com/perun-network/perun-polkadot-backend v0.2.1-0.20240822065131-d2dc885d1131/go.mod h1:ig/+ZyCMkeAEk0iTd/S3Z7Imsm+pnwkB1h6UNULNfo4=
 github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7/go.mod h1:CRroGNssyjTd/qIG2FyxByd2S8JEAZXBl4qUrZf8GS0=
 github.com/pierrec/xxHash v0.1.5 h1:n/jBpwTHiER4xYvK3/CdPVnLDPchj8eTJFFLUb4QHBo=
 github.com/pierrec/xxHash v0.1.5/go.mod h1:w2waW5Zoa/Wc4Yqe0wgrIYAGKqRMf7czn2HNKXmuL+I=
