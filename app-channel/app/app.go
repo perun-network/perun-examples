@@ -1,4 +1,4 @@
-// Copyright 2021 PolyCrypt GmbH, Germany
+// Copyright 2024 PolyCrypt GmbH, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,26 +19,70 @@ import (
 	"io"
 	"log"
 
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	"github.com/pkg/errors"
-
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 )
 
-// TicTacToeApp is a channel app.
-type TicTacToeApp struct {
+// var _ channel.AppID = new(TicTacToeAppID)
+var _ channel.AppID = (*TicTacToeAppID)(nil)
+
+type TicTacToeAppID struct {
 	Addr wallet.Address
+}
+
+type AppIDKey string
+
+// MarshalBinary marshals the contents of AppID into a byte string.
+func (a TicTacToeAppID) MarshalBinary() ([]byte, error) {
+	data, err := a.Addr.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// UnmarshalBinary converts a bytestring, representing AppID into the AppID struct.
+func (a *TicTacToeAppID) UnmarshalBinary(data []byte) error {
+	addr := &ethwallet.Address{}
+	err := addr.UnmarshalBinary(data)
+	if err != nil {
+		return err
+	}
+	appaddr := &TicTacToeAppID{addr}
+	*a = *appaddr
+	return nil
+}
+
+func (a TicTacToeAppID) Key() channel.AppIDKey {
+	b, err := a.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+	return channel.AppIDKey(b)
+}
+func (a TicTacToeAppID) Equal(b channel.AppID) bool {
+	// Type assert b to TicTacToeAppID
+	bTyped, ok := b.(*TicTacToeAppID)
+	if !ok {
+		return false
+	}
+	return a.Addr.Equal(bTyped.Addr)
+}
+
+type TicTacToeApp struct {
+	AppID TicTacToeAppID //wallet.Address
 }
 
 func NewTicTacToeApp(addr wallet.Address) *TicTacToeApp {
 	return &TicTacToeApp{
-		Addr: addr,
+		AppID: TicTacToeAppID{Addr: addr},
 	}
 }
 
-// Def returns the app address.
-func (a *TicTacToeApp) Def() wallet.Address {
-	return a.Addr
+func (a *TicTacToeApp) Def() channel.AppID {
+	return &a.AppID
 }
 
 func (a *TicTacToeApp) NewData() channel.Data {

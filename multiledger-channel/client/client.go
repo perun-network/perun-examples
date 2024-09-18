@@ -37,6 +37,7 @@ import (
 
 const (
 	txFinalityDepth = 1 // Number of blocks required to confirm a transaction.
+	gasLimit		= 500000
 )
 
 // ChainConfig is used to hold all information needed about a specific chain.
@@ -93,7 +94,7 @@ func SetupSwapClient(
 		// Setup funder.
 		funder := ethchannel.NewFunder(cb)
 		// Register the asset on the funder.
-		dep := ethchannel.NewERC20Depositor(chain.Token)
+		dep := ethchannel.NewERC20Depositor(chain.Token, gasLimit)
 		ethAcc := accounts.Account{Address: acc}
 		funder.RegisterAsset(*assets[i].(*ethchannel.Asset), dep, ethAcc)
 		// We have to register the asset of the other chain too, but use a
@@ -103,7 +104,7 @@ func SetupSwapClient(
 		multiFunder.RegisterFunder(chain.ChainID, funder)
 
 		// Setup adjudicator.
-		adj := ethchannel.NewAdjudicator(cb, chain.Adjudicator, acc, ethAcc)
+		adj := ethchannel.NewAdjudicator(cb, chain.Adjudicator, acc, ethAcc, gasLimit)
 		// Register the adjudicator on the multi-adjudicator.
 		multiAdjudicator.RegisterAdjudicator(chain.ChainID, adj)
 	}

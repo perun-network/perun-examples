@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.13.5
-	github.com/perun-network/perun-eth-backend v0.1.0
+	github.com/perun-network/perun-eth-backend v0.5.0
 	github.com/pkg/errors v0.9.1
-	perun.network/go-perun v0.10.6
+	perun.network/go-perun v0.11.0
 )
 
 require (
@@ -25,7 +25,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
