@@ -1,0 +1,30 @@
+{
+  "replica_rev": "3d0b3f10417fc6708e8b5d844a0bac5e86f3e17d",
+  "type": "replica",
+  "config": {
+    "http_handler": {
+      "port": null,
+      "write_port_to": "/mnt/c/Users/CAC/Documents/Go/perun/perun-examples/payment-channel-icp/userdata/.dfx/network/local/replica-configuration/replica-1.port"
+    },
+    "state_manager": {
+      "state_root": "/mnt/c/Users/CAC/Documents/Go/perun/perun-examples/payment-channel-icp/userdata/.dfx/network/local/state/replicated_state"
+    },
+    "crypto": {
+      "crypto_root": "/mnt/c/Users/CAC/Documents/Go/perun/perun-examples/payment-channel-icp/userdata/.dfx/network/local/state/crypto_store"
+    },
+    "artifact_pool": {
+      "consensus_pool_path": "/mnt/c/Users/CAC/Documents/Go/perun/perun-examples/payment-channel-icp/userdata/.dfx/network/local/state/consensus_pool"
+    },
+    "subnet_type": "system",
+    "btc_adapter": {
+      "enabled": false,
+      "socket_path": null
+    },
+    "canister_http_adapter": {
+      "enabled": true,
+      "socket_path": "/tmp/ic-https-outcalls-adapter-socket.4513.1726666364"
+    },
+    "log_level": "error",
+    "artificial_delay": 600
+  }
+}
