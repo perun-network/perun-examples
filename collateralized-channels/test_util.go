@@ -23,9 +23,15 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"perun.network/go-perun/wire"
+	"perun.network/perun-collateralized-channels/app"
 	"perun.network/perun-collateralized-channels/client"
 	"perun.network/perun-collateralized-channels/eth"
+
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
 )
 
 type Environment struct {
@@ -40,7 +46,7 @@ func (e *Environment) ClientName(clientAddr common.Address) string {
 	return name
 }
 
-func (e *Environment) logAccountBalance(clients ...*client.Client) {
+func (e *Environment) logAccountBalance(clients ...*client.AppClient) {
 	for _, c := range clients {
 		globalBalance, err := c.OnChainBalance()
 		if err != nil {
@@ -50,11 +56,11 @@ func (e *Environment) logAccountBalance(clients ...*client.Client) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("%v: Account Balance: Global=%v, Locked as Collateral=%v", e.ClientName(c.Address()), toEth(globalBalance), toEth(collateralBalance))
+		log.Printf("%v: Account Balance: Global=%v, Locked as Collateral=%v", e.ClientName(c.WalletAddress()), toEth(globalBalance), toEth(collateralBalance))
 	}
 }
 
-func (l *Environment) logChannelBalances(clients ...*client.Client) {
+func (l *Environment) logChannelBalances(clients ...*client.AppClient) {
 	for _, c := range clients {
 		channelBalances, err := c.ChannelBalances()
 		if err != nil {
@@ -62,7 +68,7 @@ func (l *Environment) logChannelBalances(clients ...*client.Client) {
 		}
 
 		var b strings.Builder
-		fmt.Fprintf(&b, "%v: ", l.ClientName(c.Address()))
+		fmt.Fprintf(&b, "%v: ", l.ClientName(c.WalletAddress()))
 		for peer, bal := range channelBalances {
 			balCollateral, err := c.ChannelFunding(peer)
 			if err != nil {
@@ -122,4 +128,36 @@ func deployContracts(nodeURL string, deploymentKey *ecdsa.PrivateKey, contextTim
 
 type ContractAddresses struct {
 	AdjudicatorAddr, AssetHolderAddr, AppAddr common.Address
+}
+
+func setupClient(
+	bus wire.Bus,
+	nodeURL string,
+	chainID uint64,
+	assetHolderAddr common.Address,
+	privateKey *ecdsa.PrivateKey,
+	app *app.CollateralApp,
+	updatePolicy client.PaymentAcceptancePolicy,
+	challengeDuration time.Duration,
+	contextTimeout time.Duration,
+
+) (*client.AppClient, error) {
+	w := swallet.NewWallet(privateKey)
+	acc := crypto.PubkeyToAddress(privateKey.PublicKey)
+	eaddr := ethwallet.AsWalletAddr(acc)
+
+	// Create and start client.
+	return client.SetupAppClient(
+		bus,
+		w,
+		acc,
+		assetHolderAddr,
+		eaddr,
+		nodeURL,
+		chainID,
+		app,
+		updatePolicy,
+		challengeDuration,
+		contextTimeout,
+	)
 }

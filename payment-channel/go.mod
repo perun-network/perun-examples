@@ -1,11 +1,12 @@
 module perun.network/perun-examples/payment-channel
 
-go 1.17
+go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.10.12
+	github.com/perun-network/perun-eth-backend v0.1.0
 	github.com/pkg/errors v0.9.1
-	perun.network/go-perun v0.8.0
+	perun.network/go-perun v0.10.6
 )
 
 require (
@@ -29,4 +30,5 @@ require (
 	golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37 // indirect
 )

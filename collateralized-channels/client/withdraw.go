@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package perun
+package client
 
 import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/perun-network/perun-eth-backend/wallet"
 	"github.com/pkg/errors"
-	"perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-collateralized-channels/contracts/generated/collateralAssetHolderETH"
