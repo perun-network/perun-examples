@@ -23,9 +23,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - uses: dfinity/setup-dfx@main
+
       - name: Pull ganache-cli image
         run: docker pull ${{ env.ganache-image }}
 
+      - name: Payment Channel ICP
+        working-directory: payment-channel-icp
+        run: |
+          chmod +x ./startdeploy.sh
+          chmod +x ./startdfx.sh
+          chmod +x ./stopdfx.sh
+          ./startdeploy.sh
+
+          sleep 30
+          go run ./
+      
       - name: Simple Client
         working-directory: simple-client
         env:
