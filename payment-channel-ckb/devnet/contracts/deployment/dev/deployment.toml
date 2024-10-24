@@ -37,5 +37,5 @@ location = { file = "build/release/sample-udt" }
 # # For example the secp256k1 lock
 [lock]
 code_hash = "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"
-args = "0x4a3c88737f8d4d26031ad9a6d6448ba75f1533e2"
+args = "0x0e25b0d61b3884068dc69bf94a115037b5af436c"
 hash_type = "type"

@@ -1,4 +1,4 @@
-module perun.network/perun-ckb-demo
+module perun.network/perun-examples/payment-channel-ckb
 
 go 1.17
 
@@ -8,7 +8,7 @@ require (
 	github.com/perun-network/perun-libp2p-wire v0.0.0-20240514121025-635388735967
 	github.com/stretchr/testify v1.9.0
 	perun.network/go-perun v0.10.7-0.20230808153546-74844191e56e
-	perun.network/perun-ckb-backend v0.0.0-20240514141411-35bdf3afa166
+	perun.network/perun-ckb-backend v0.0.0-20241024114309-500054212d66
 	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37
 )
 
@@ -111,4 +111,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/nervosnetwork/ckb-sdk-go/v2 v2.2.0 => github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20230601140721-2bf596fddd80
+replace github.com/nervosnetwork/ckb-sdk-go/v2 v2.2.0 => github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20241016165355-d1c9686fe018

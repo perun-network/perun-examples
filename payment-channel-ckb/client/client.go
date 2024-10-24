@@ -1,9 +1,22 @@
+// Copyright 2024 PolyCrypt GmbH
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package client
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -70,18 +83,7 @@ func NewPaymentClient(
 	if err != nil {
 		return nil, err
 	}
-	/*
-		wireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-		net, err := p2p.NewP2PBus(wireAcc)
-		if err != nil {
-			panic(errors.Wrap(err, "creating p2p net"))
-		}
-		bus := net.Bus
-		listener := net.Listener
 
-		//wAddr := simple.NewAddress(account.Address().String())
-		wAddr := wireAcc.Address()
-	*/
 	perunClient, err := client.New(wAddr, net.Bus, f, a, wallet, watcher)
 	if err != nil {
 		return nil, err
@@ -105,7 +107,6 @@ func NewPaymentClient(
 		net:         net,
 	}
 
-	//go p.PollBalances()
 	go perunClient.Handle(p, p)
 	return p, nil
 }
@@ -130,14 +131,6 @@ func (p *PaymentClient) GetSudtBalance() *big.Int {
 	return new(big.Int).Set(p.sudtBalance)
 }
 
-// TODO: Remove as probably not required
-/*
-func (p *PaymentClient) NotifyAllBalance(ckbBal int64) string {
-	str := FormatBalance(new(big.Int).SetInt64(ckbBal), p.GetSudtBalance())
-	return str
-}
-*/
-
 // GetBalances retrieves the current balances of the client.
 func (p *PaymentClient) GetBalances() string {
 	p.PollBalances()
@@ -149,7 +142,6 @@ func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts ma
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	log.Println("OpenChannel called")
 	participants := []wire.Address{p.WireAddress(), peer}
 	p.net.Dialer.Register(peer, peerID)
 
@@ -162,7 +154,6 @@ func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts ma
 
 	// We create an initial allocation which defines the starting balances.
 	initAlloc := gpchannel.NewAllocation(2, assets...)
-	log.Println(initAlloc.Assets)
 	for a, amount := range amounts {
 		switch a := a.(type) {
 		case *asset.Asset:
@@ -183,7 +174,6 @@ func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts ma
 		}
 
 	}
-	log.Println("Created Allocation")
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
@@ -197,22 +187,15 @@ func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts ma
 		panic(err)
 	}
 
-	log.Println("Created Proposal")
-
 	// Send the proposal.
 	ch, err := p.PerunClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		panic(err)
 	}
 
-	log.Println("Sent Channel")
-
 	// Start the on-chain event watcher. It automatically handles disputes.
 	p.startWatching(ch)
 
-	log.Println("Started Watching")
-
-	//p.Channel = newPaymentChannel(ch, assets)
 	return newPaymentChannel(ch, assets)
 }
 

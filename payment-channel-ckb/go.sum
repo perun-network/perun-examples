@@ -984,6 +984,8 @@ github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222/go.mod h1:VyrYX9gd7ir
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20230601140721-2bf596fddd80 h1:45S239s+5oGVJHakd+BjfZmstG7wHnA8Tkeq43R9eFA=
 github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20230601140721-2bf596fddd80/go.mod h1:nPpBML8fuaM1NgkKCwv2gSHiCv+xKH43fu8LA9LOQUg=
+github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20241016165355-d1c9686fe018 h1:oURRmvOUVKfNFqhqBonJY1VHKxziyhw4zkL0QLj+m3M=
+github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20241016165355-d1c9686fe018/go.mod h1:nPpBML8fuaM1NgkKCwv2gSHiCv+xKH43fu8LA9LOQUg=
 github.com/perun-network/perun-libp2p-wire v0.0.0-20240514121025-635388735967 h1:m+63gl1KMpLdseyNEKLnUFrCYipD9Q0Cnf/hmOwAkhs=
 github.com/perun-network/perun-libp2p-wire v0.0.0-20240514121025-635388735967/go.mod h1:kA/iWKN+2BvzxuUllMmd1IY6H2oKUZ18U+60hrY19EM=
 github.com/peterh/liner v1.0.1-0.20180619022028-8c1271fcf47f/go.mod h1:xIteQHvHuaLYG9IFj6mSxM0fCKrs34IrEQUhOYuGPHc=
@@ -1743,6 +1745,16 @@ perun.network/go-perun v0.10.7-0.20230808153546-74844191e56e h1:4SOKO0WZtcsQUwP5
 perun.network/go-perun v0.10.7-0.20230808153546-74844191e56e/go.mod h1:BGBZC3npkX457u87pjDd0NEIXr1a4dsH4H/YpLdGGe8=
 perun.network/perun-ckb-backend v0.0.0-20240514141411-35bdf3afa166 h1:Y/3rPrDpspxiMDkh43sV7lkmbSDTM+m37e66kDEidR0=
 perun.network/perun-ckb-backend v0.0.0-20240514141411-35bdf3afa166/go.mod h1:Ebp1GCFpmlSlxuP+fSO9yk/qAllF+6GhRCe7b2533zs=
+perun.network/perun-ckb-backend v0.0.0-20241015122508-45da4c9d6fe5 h1:YbzclIVXy50wJbcTcdmhjS7bGnQgh//fT7FlNpNPnzA=
+perun.network/perun-ckb-backend v0.0.0-20241015122508-45da4c9d6fe5/go.mod h1:Ebp1GCFpmlSlxuP+fSO9yk/qAllF+6GhRCe7b2533zs=
+perun.network/perun-ckb-backend v0.0.0-20241023133833-11f690d8c9e7 h1:07bC19/sog24+i1nmeaVs3MhrfYw5CoNUNcr9DXuMYA=
+perun.network/perun-ckb-backend v0.0.0-20241023133833-11f690d8c9e7/go.mod h1:Ebp1GCFpmlSlxuP+fSO9yk/qAllF+6GhRCe7b2533zs=
+perun.network/perun-ckb-backend v0.0.0-20241023162805-3b8074dc74c2 h1:kDCZrLR3ko/+b9foUJ0MfQ7fMmnjnQEh9M6cKp+tX+g=
+perun.network/perun-ckb-backend v0.0.0-20241023162805-3b8074dc74c2/go.mod h1:cFfA6/mX8ePTuFrd5cyHhzx1H8hnHs99WrLB9LS+Xbo=
+perun.network/perun-ckb-backend v0.0.0-20241024105944-780da45b4f9a h1:Di+tDK9d19gTGlfFn6fxXHCkcfQnvbZs40U+1KQQgRA=
+perun.network/perun-ckb-backend v0.0.0-20241024105944-780da45b4f9a/go.mod h1:cFfA6/mX8ePTuFrd5cyHhzx1H8hnHs99WrLB9LS+Xbo=
+perun.network/perun-ckb-backend v0.0.0-20241024114309-500054212d66 h1:0k3zF5+xY7TXbTRbCsrSqPJ7I6hRdu/6mHxRwUtnakU=
+perun.network/perun-ckb-backend v0.0.0-20241024114309-500054212d66/go.mod h1:cFfA6/mX8ePTuFrd5cyHhzx1H8hnHs99WrLB9LS+Xbo=
 polycry.pt/poly-go v0.0.0-20220222131629-aa4bdbaab60b/go.mod h1:XUBrNtqgEhN3EEOP/5gh7IBd3xVHKidCjXDZfl9+kMU=
 polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37 h1:iA5GzEa/hHfVlQpimEjPV09NATwHXxSjWNB0VVodtew=
 polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37/go.mod h1:XUBrNtqgEhN3EEOP/5gh7IBd3xVHKidCjXDZfl9+kMU=
