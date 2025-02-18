@@ -95,7 +95,7 @@ func SetupPaymentClient(
 
 	// Setup funder.
 	ethFunder := ethchannel.NewFunder(cb)
-	ethAssetID := ethchannel.MakeAssetID(big.NewInt(int64(chainID)))
+	ethAssetID := ethchannel.MakeLedgerBackendID(big.NewInt(int64(chainID)))
 	stellarAssetID := chtypes.MakeCCID(chtypes.MakeContractID("2"))
 	multiFunder.RegisterFunder(ethAssetID, ethFunder)
 	multiFunder.RegisterFunder(stellarAssetID, stellarFunder)

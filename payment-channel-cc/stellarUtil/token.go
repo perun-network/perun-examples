@@ -57,7 +57,7 @@ func Deploy(kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
 	}
 
 	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeInstall, &preFlightOp)
-	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
+	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall, client.NETWORK_PASSPHRASE)
 	if err != nil {
 		panic(err)
 	}
@@ -73,7 +73,7 @@ func Deploy(kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
 		panic(err)
 	}
 	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeDeploy, &preFlightOpCreate)
-	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
+	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate, client.NETWORK_PASSPHRASE)
 	if err != nil {
 		panic(err)
 	}

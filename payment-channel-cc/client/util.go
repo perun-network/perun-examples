@@ -44,7 +44,7 @@ func CreateContractBackend(
 		return ethchannel.ContractBackend{}, err
 	}
 
-	return ethchannel.NewContractBackend(ethClient, ethchannel.MakeAssetID(big.NewInt(int64(chainID))), transactor, txFinalityDepth), nil
+	return ethchannel.NewContractBackend(ethClient, ethchannel.MakeChainID(big.NewInt(int64(chainID))), transactor, txFinalityDepth), nil
 }
 
 // WalletAddress returns the wallet address of the client.

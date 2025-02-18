@@ -66,6 +66,7 @@ func main() {
 	bob := ethereumUtil.SetupPaymentClient(bus, chainURL, adjudicator, asset, kBob, setup.GetWallets()[1], setup.GetAccounts()[1], setup.GetTokenAsset()[1], setup.GetFunders()[1], setup.GetAdjudicators()[1])
 
 	log.Println("Participants: ", alice.WireAddress(), bob.WireAddress())
+
 	// Print balances before transactions.
 	l := ethereumUtil.NewBalanceLogger(chainURL)
 	l.LogBalances(alice.WalletEthAddress(), bob.WalletEthAddress())
@@ -80,8 +81,8 @@ func main() {
 	chBob.SendStellarPayment(50)
 
 	log.Println("Settling channel.")
-	chAlice.Settle() // Conclude and withdraw.
-	chBob.Settle()   // Withdraw.
+	chBob.Settle()   // Conclude and withdraw.
+	chAlice.Settle() // Withdraw.
 
 	// Print balances after transactions.
 	l.LogBalances(alice.WalletEthAddress(), bob.WalletEthAddress())

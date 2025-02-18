@@ -141,8 +141,8 @@ func NewExampleSetup(sk []string, addr [][20]byte) (*Setup, error) {
 		return nil, err
 	}
 
-	test.InitTokenContract(depTokenOneKp, tokenAddressOne)
-	test.InitTokenContract(depTokenTwoKp, tokenAddressTwo)
+	test.InitTokenContract(depTokenOneKp, tokenAddressOne, client.HorizonURL)
+	test.InitTokenContract(depTokenTwoKp, tokenAddressTwo, client.HorizonURL)
 
 	SetupAccountsAndContracts(depTokenKps, kpsToFund, tokenAddresses, initTokenBalance)
 
@@ -155,7 +155,7 @@ func NewExampleSetup(sk []string, addr [][20]byte) (*Setup, error) {
 		assetContractIDs = append(assetContractIDs, assetContractID)
 	}
 
-	cbs := test.NewContractBackendsFromKeys(kpsToFund, []pwallet.Account{accs[0], accs[1]})
+	cbs := test.NewContractBackendsFromKeys(kpsToFund, []pwallet.Account{accs[0], accs[1]}, client.HorizonURL)
 
 	aliceCB := cbs[0]
 	aliceWallet := ws[0]
@@ -167,7 +167,7 @@ func NewExampleSetup(sk []string, addr [][20]byte) (*Setup, error) {
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := test.CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenVector)
+	funders, adjs := test.CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenVector, false)
 
 	setup := Setup{
 		accs:     channelAccs,
