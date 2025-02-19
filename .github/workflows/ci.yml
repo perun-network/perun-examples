@@ -52,6 +52,23 @@ jobs:
           go run .
           docker stop ganache
 
+      - name: Payment Channel XLM
+        working-directory: payment-channel-xlm
+        run: |
+          pkill -f quickstart.sh || true
+          
+          sleep 5
+          chmod +x ./testdata/docker/build.sh
+          ./testdata/docker/build.sh
+
+          chmod +x ./quickstart.sh
+          ./quickstart.sh standalone &
+
+          sleep 50
+          go run ./
+          docker stop stellar
+          sleep 5
+
       - name: Payment Channel Cross-Contract
         working-directory: payment-channel-cc
         env:
@@ -69,6 +86,21 @@ jobs:
           ./quickstart.sh standalone &
           
           sleep 50
+          go run .
+          docker stop ganache
+          docker stop stellar
+
+      - name: App Channel
+        working-directory: app-channel
+        env:
+          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+          BALANCE: "10000000000000000000"
+        run: |
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }}  --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
+
+          sleep 5
           go run .
           docker stop ganache
 
@@ -90,35 +122,6 @@ jobs:
           sleep 5
           go run .
           docker stop polkadot
-
-      - name: App Channel
-        working-directory: app-channel
-        env:
-          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
-          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
-          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
-          BALANCE: "10000000000000000000"
-        run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }}  --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
-
-          sleep 5
-          go run .
-          docker stop ganache
-
-      - name: Payment Channel XLM
-        working-directory: payment-channel-xlm
-        run: |
-          pkill -f quickstart.sh || true
-          
-          sleep 5
-          chmod +x ./testdata/docker/build.sh
-          ./testdata/docker/build.sh
-
-          chmod +x ./quickstart.sh
-          ./quickstart.sh standalone &
-
-          sleep 30
-          go run ./
 
       - name: Payment Channel CKB
         working-directory: payment-channel-ckb
