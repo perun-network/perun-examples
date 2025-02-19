@@ -68,7 +68,7 @@ jobs:
           chmod +x ./quickstart.sh
           ./quickstart.sh standalone &
           
-          sleep 30
+          sleep 50
           go run .
           docker stop ganache
 
