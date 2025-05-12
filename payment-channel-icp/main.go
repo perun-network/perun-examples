@@ -20,7 +20,7 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-icp-backend/client"
+	"perun.network/perun-examples/payment-channel-icp/client"
 	"perun.network/perun-icp-backend/wallet"
 )
 
