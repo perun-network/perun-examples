@@ -24,6 +24,8 @@ jobs:
             ${{ runner.os }}-go-
 
       - uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: 0.15.0
 
       - name: Pull ganache-cli image
         run: docker pull ${{ env.ganache-image }}
@@ -38,6 +40,8 @@ jobs:
 
           sleep 30
           go run ./
+
+          ./stopdfx.sh
       
       - name: Simple Client
         working-directory: simple-client
