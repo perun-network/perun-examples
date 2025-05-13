@@ -36,12 +36,14 @@ jobs:
           chmod +x ./startdeploy.sh
           chmod +x ./startdfx.sh
           chmod +x ./stopdfx.sh
+
+          ./stopdfx.sh || true
           ./startdeploy.sh
 
           sleep 30
           go run ./
 
-          trap './stopdfx.sh; exit 0' SIGTERM
+          ./stopdfx.sh || true
       
       - name: Simple Client
         working-directory: simple-client
