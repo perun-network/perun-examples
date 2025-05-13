@@ -76,7 +76,7 @@ func (c PaymentChannel) Settle() {
 	}
 
 	// Settle concludes the channel and withdraws the funds.
-	err := c.ch.Settle(context.TODO())
+	err := c.ch.Settle(context.TODO(), false)
 	if err != nil {
 		panic(err)
 	}
