@@ -131,12 +131,17 @@ jobs:
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
         run: |
+          pkill -f quickstart.sh || true
+          
+          sleep 5
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
 
           chmod +x ./quickstart.sh
           ./quickstart.sh standalone &
 
-          sleep 30
+          sleep 50
           go run ./
+          docker stop stellar
+          sleep 5
 
