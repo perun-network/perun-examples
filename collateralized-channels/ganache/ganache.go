@@ -67,12 +67,11 @@ func StartGanacheWithPrefundedAccounts(cfg GanacheConfig) (ganache *Ganache, err
 	// Build ganache command line arguments
 	var ganacheArgs []string
 	ganacheArgs = append(ganacheArgs, "--port", fmt.Sprint(cfg.Port))
-	ganacheArgs = append(ganacheArgs, "--wallet.accounts")
 	for _, a := range accounts {
 		key := hexutil.Encode(crypto.FromECDSA(a.PrivateKey))
-		ganacheArgs = append(ganacheArgs, fmt.Sprintf("%v,%v", key, a.Amount))
+		ganacheArgs = append(ganacheArgs, "--account", fmt.Sprintf("%v,%v", key, a.Amount))
 	}
-	ganacheArgs = append(ganacheArgs, fmt.Sprintf("-b %v", int(cfg.BlockTime.Seconds())))
+	ganacheArgs = append(ganacheArgs, fmt.Sprintf("--blockTime=%v", int(cfg.BlockTime.Seconds())))
 
 	// Start command
 	ganacheCmdTokens := strings.Split(cfg.Cmd, " ")

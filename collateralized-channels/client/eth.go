@@ -20,9 +20,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (c *AppClient) transactAndConfirm(transact func(tr *bind.TransactOpts) (*types.Transaction, error)) (err error) {
+func (c *Client) transactAndConfirm(transact func(tr *bind.TransactOpts) (*types.Transaction, error)) (err error) {
 	ctx := c.defaultContext()
-	tr, err := c.transactor.NewTransactor(c.ethAcc)
+
+	tr, err := c.perunClient.Wallet.NewTransactor(c.perunClient.Account.Account)
 	tr.Context = ctx
 	if err != nil {
 		return errors.WithMessage(err, "creating transactor")
@@ -33,7 +34,7 @@ func (c *AppClient) transactAndConfirm(transact func(tr *bind.TransactOpts) (*ty
 		return errors.WithMessage(err, "submitting transaction")
 	}
 
-	receipt, err := bind.WaitMined(ctx, c.contractBackend, tx)
+	receipt, err := bind.WaitMined(ctx, c.perunClient.ContractBackend, tx)
 	if err != nil {
 		return errors.WithMessage(err, "awaiting transaction confirmation")
 	}

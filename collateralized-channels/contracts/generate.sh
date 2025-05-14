@@ -2,50 +2,28 @@
 
 set -e
 
-# Define ABIGEN and SOLC default values.
-ABIGEN=abigen
-SOLC=solc
-
-echo 'Please ensure that solc v0.8.15+ and abigen 1.10.18+ are installed.'
-
-if ! $ABIGEN --version
+if [ -z "$ABIGEN" ]
 then
-    echo "'abigen' not found. Please add to PATH or set ABIGEN='path_to_abigen'."
-    exit 1
+    ABIGEN=abigen
 fi
 
-if ! $SOLC --version
+if [ -z "$SOLC" ]
 then
-    echo "'solc' not found. Please add to PATH or set SOLC='path_to_solc'."
-    exit 1
+    SOLC=solc
 fi
-
-echo "Please ensure that the repository was cloned with submodules: 'git submodule update --init --recursive'."
 
 # Generate golang bindings from solidity contract
 # Argument 1: solidity contract file
 # Argument 2: golang contract name (used for package and file)
 generate_bindings() {
-    FILE=$1
-    PKG=$2
-    CONTRACT=$FILE
+    CONTRACT_SOL_FILE=$1
+    CONTRACT_GO_NAME=$2
+    PKG=$CONTRACT_GO_NAME
     GENDIR=./generated/$PKG
-
-    echo "Generating $PKG bindings..."
-    rm -r $GENDIR
     mkdir -p $GENDIR
-
-    # Compile and generate binary runtime
-    $SOLC --abi --bin --optimize $FILE.sol -o $GENDIR
-
-    # Generate bindings.
-    $ABIGEN --pkg $PKG --abi $GENDIR/$FILE.abi --bin $GENDIR/$FILE.bin --out $GENDIR/$CONTRACT.go
-
-     # Clean up .abi and .bin files
-    find $GENDIR -name "*.abi" -type f -delete
-    find $GENDIR -name "*.bin" -type f -delete
+    $ABIGEN --pkg $PKG --sol $CONTRACT_SOL_FILE --out $GENDIR/$CONTRACT_GO_NAME.go --solc $SOLC
 }
 
-generate_bindings ./Adjudicator adjudicator
-generate_bindings ./CollateralApp collateralApp
-generate_bindings ./CollateralAssetHolderETH collateralAssetHolderETH
+generate_bindings ./Adjudicator.sol adjudicator
+generate_bindings ./CollateralApp.sol collateralApp
+generate_bindings ./CollateralAssetHolderETH.sol collateralAssetHolderETH

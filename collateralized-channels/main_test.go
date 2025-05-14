@@ -15,6 +15,7 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"log"
 	"math/big"
@@ -23,12 +24,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/wire"
-	"perun.network/perun-collateralized-channels/app"
+	"perun.network/go-perun/backend/ethereum/wallet"
+	"perun.network/perun-collateralized-channels/client"
 	"perun.network/perun-collateralized-channels/eth"
 	"perun.network/perun-collateralized-channels/ganache"
+	"perun.network/perun-collateralized-channels/perun"
 )
 
 // TestCollateralizedChannels is an end-to-end test of collateral channels.
@@ -48,7 +49,7 @@ func TestCollateralizedChannels(t *testing.T) {
 	// Ganache config
 	ganacheCmd := os.Getenv("GANACHE_CMD")
 	if len(ganacheCmd) == 0 {
-		ganacheCmd = "ganache"
+		ganacheCmd = "ganache-cli"
 	}
 	ganacheCfg := ganache.GanacheConfig{
 		Cmd:         ganacheCmd,
@@ -61,10 +62,10 @@ func TestCollateralizedChannels(t *testing.T) {
 
 	// More test parameters
 	var (
-		chainID                   = 1337 // default chainID of Ganache
 		defaultContextTimeout     = 30 * time.Second
 		collateralWithdrawalDelay = 10 * ganacheCfg.BlockTime
-		defaultChallengeDuration  = collateralWithdrawalDelay / 2
+		hostClient1               = "127.0.0.1:8546"
+		hostClient2               = "127.0.0.1:8547"
 		collateralClient1         = eth.EthToWei(big.NewFloat(50))
 		payment1Client1ToClient2  = eth.EthToWei(big.NewFloat(5))
 		channelFundingClient1     = eth.EthToWei(big.NewFloat(25))
@@ -83,32 +84,53 @@ func TestCollateralizedChannels(t *testing.T) {
 	deploymentKey := ganache.Accounts[0].PrivateKey
 	contracts, err := deployContracts(nodeURL, deploymentKey, defaultContextTimeout, collateralWithdrawalDelay)
 	require.NoError(err, "deploying contracts")
-	app := app.NewCollateralApp(ethwallet.AsWalletAddr(contracts.AppAddr))
+
+	// Helper function for client setup
+	genClientDef := func(privateKey *ecdsa.PrivateKey, host string, peerAddress common.Address, peerHost string) client.ClientConfig {
+		return client.ClientConfig{
+			ClientConfig: perun.ClientConfig{
+				PrivateKey:      privateKey,
+				Host:            host,
+				ETHNodeURL:      nodeURL,
+				AdjudicatorAddr: contracts.AdjudicatorAddr,
+				AssetHolderAddr: contracts.AssetHolderAddr,
+				DialerTimeout:   1 * time.Second,
+				PeerAddresses: []perun.PeerWithAddress{
+					{
+						Peer:    wallet.AsWalletAddr(peerAddress),
+						Address: peerHost,
+					},
+				},
+			},
+			ChallengeDuration: collateralWithdrawalDelay / 2,
+			AppAddress:        contracts.AppAddr,
+			ContextTimeout:    defaultContextTimeout,
+		}
+	}
 
 	log.Print("Setting up clients...")
-	bus := wire.NewLocalBus() // Message bus used for off-chain communication.
-
 	// Setup Client1
+	clientDef1 := genClientDef(
+		ganache.Accounts[1].PrivateKey, hostClient1,
+		ganache.Accounts[2].Address(), hostClient2,
+	)
 	paymentAcceptancePolicy1 := func(
 		amount, collateral, funding, balance *big.Int,
 		hasOverdrawn bool,
 	) (ok bool) {
 		return true
 	}
-	c1, err := setupClient(
-		bus,
-		nodeURL,
-		uint64(chainID), // Convert chainID to uint64
-		contracts.AssetHolderAddr,
-		ganache.Accounts[1].PrivateKey,
-		app,
+	c1, err := client.SetupClient(
+		clientDef1,
 		paymentAcceptancePolicy1,
-		defaultChallengeDuration,
-		defaultContextTimeout,
 	)
 	require.NoError(err, "Client1 setup")
 
 	// Setup Client2
+	clientDef2 := genClientDef(ganache.
+		Accounts[2].PrivateKey, hostClient2,
+		ganache.Accounts[1].Address(), hostClient1,
+	)
 	paymentAcceptancePolicy2 := func(
 		amount, collateral, funding, balance *big.Int,
 		hasOverdrawn bool,
@@ -123,22 +145,15 @@ func TestCollateralizedChannels(t *testing.T) {
 		// We accept all other payments.
 		return true
 	}
-	c2, err := setupClient(
-		bus,
-		nodeURL,
-		uint64(chainID), // Convert chainID to uint64
-		contracts.AssetHolderAddr,
-		ganache.Accounts[2].PrivateKey,
-		app,
+	c2, err := client.SetupClient(
+		clientDef2,
 		paymentAcceptancePolicy2,
-		defaultChallengeDuration,
-		defaultContextTimeout,
 	)
 	require.NoError(err, "Client2 setup")
 
 	e := &Environment{map[common.Address]string{
-		c1.WalletAddress(): "Client1",
-		c2.WalletAddress(): "Client2",
+		c1.Address(): "Client1",
+		c2.Address(): "Client2",
 	}}
 	e.logAccountBalance(c1, c2)
 	log.Print("Setup done.")
@@ -151,26 +166,26 @@ func TestCollateralizedChannels(t *testing.T) {
 
 	// Send payment from Client1 to Client2
 	log.Printf("Client1: Sending %v to Client2...", toEth(payment1Client1ToClient2))
-	err = c1.SendPayment(c2.WalletAddress(), payment1Client1ToClient2) // open unfunded channel, handle channel proposal, transfer amount, handle update
+	err = c1.SendPayment(c2.Address(), payment1Client1ToClient2) // open unfunded channel, handle channel proposal, transfer amount, handle update
 	require.NoError(err, "Client1 sending payment to Client2")
 	e.logChannelBalances(c1, c2)
 
 	// Client1 deposits channel funding
 	log.Printf("Client1: Depositing %v as channel funding...", toEth(channelFundingClient1))
-	err = c1.IncreaseChannelCollateral(c2.WalletAddress(), channelFundingClient1)
+	err = c1.IncreaseChannelCollateral(c2.Address(), channelFundingClient1)
 	require.NoError(err, "Client1 increasing channel funding")
 	e.logAccountBalance(c1)
 	e.logChannelBalances(c1)
 
 	// Client1 sends another payment to Client2
 	log.Printf("Client1: Sending %v to Client2...", toEth(payment2Client1ToClient2))
-	err = c1.SendPayment(c2.WalletAddress(), payment2Client1ToClient2) // send another payment
+	err = c1.SendPayment(c2.Address(), payment2Client1ToClient2) // send another payment
 	require.NoError(err, "Client1 sending another payment to Client2")
 	e.logChannelBalances(c1, c2)
 
 	// Client2 settles the channel and withdraws the received payments
 	log.Print("Client2: Settling channel...")
-	err = c2.Settle(c1.WalletAddress()) // c2 settles channel with c1
+	err = c2.Settle(c1.Address()) // c2 settles channel with c1
 	require.NoError(err, "Client2 settling the channel")
 	e.logAccountBalance(c2)
 
