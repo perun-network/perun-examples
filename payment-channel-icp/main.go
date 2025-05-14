@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-icp-backend/client"
+	"perun.network/perun-examples/payment-channel-icp/client"
 	"perun.network/perun-icp-backend/wallet"
 )
 
