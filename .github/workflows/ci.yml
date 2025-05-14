@@ -38,16 +38,6 @@ jobs:
 
           sleep 30
           go run ./
-      
-      - name: Simple Client
-        working-directory: simple-client
-        env:
-          MNEMONIC: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
-        run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }} -b 5 -a 2 -m "$MNEMONIC"
-          sleep 5
-          go run .
-          docker stop ganache
 
       - name: Payment Channel CKB
         working-directory: payment-channel-ckb

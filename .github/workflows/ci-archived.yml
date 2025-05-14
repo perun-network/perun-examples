@@ -35,7 +35,7 @@ jobs:
               run: docker pull ${{ env.ganache-image }}
 
             - name: Simple Client
-              working-directory: simple-client
+              working-directory: archived/simple-client
               env:
                 MNEMONIC: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
               run: |
@@ -45,7 +45,7 @@ jobs:
                 docker stop ganache
             
             - name: Collateralized Channels
-              working-directory: collateralized-channels
+              working-directory: archived/collateralized-channels
               env:
                 GANACHE_CMD: "docker run --name ganache --rm --publish 8545:8545 ${{ env.ganache-image }}"
               run: | 
