@@ -25,7 +25,7 @@ jobs:
 
       - uses: dfinity/setup-dfx@main
         with:
-          dfx-version: 0.15.0
+          dfx-version: 0.25.1
 
       - name: Pull ganache-cli image
         run: docker pull ${{ env.ganache-image }}
@@ -106,7 +106,7 @@ jobs:
           ./stopdfx.sh || true # stop any running dfx
           ./startdeploy.sh
 
-          sleep 30
+          sleep 15
           go run ./
 
           ./stopdfx.sh || true
