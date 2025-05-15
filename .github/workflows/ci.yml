@@ -115,6 +115,8 @@ jobs:
           sleep 30
           go run ./
 
+          ./stopdfx.sh || true
+
       - name: Payment Channel DOT
         working-directory: payment-channel-dot
         run: |
