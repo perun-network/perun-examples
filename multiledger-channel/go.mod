@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.10.12
-	github.com/perun-network/perun-eth-backend v0.1.0
+	github.com/perun-network/perun-eth-backend v0.5.0
 	github.com/pkg/errors v0.9.1
-	perun.network/go-perun v0.10.6
+	perun.network/go-perun v0.11.0
 )
 
 require (
