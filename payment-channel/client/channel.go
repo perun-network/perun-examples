@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"math/big"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
