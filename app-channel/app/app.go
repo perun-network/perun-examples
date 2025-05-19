@@ -21,24 +21,25 @@ import (
 
 	"github.com/pkg/errors"
 
+	ethchannel "github.com/perun-network/perun-eth-backend/channel"
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	"perun.network/go-perun/channel"
-	"perun.network/go-perun/wallet"
 )
 
 // TicTacToeApp is a channel app.
 type TicTacToeApp struct {
-	Addr wallet.Address
+	ID channel.AppID
 }
 
-func NewTicTacToeApp(addr wallet.Address) *TicTacToeApp {
+func NewTicTacToeApp(addr *ethwallet.Address) *TicTacToeApp {
 	return &TicTacToeApp{
-		Addr: addr,
+		ID: &ethchannel.AppID{addr},
 	}
 }
 
-// Def returns the app address.
-func (a *TicTacToeApp) Def() wallet.Address {
-	return a.Addr
+// Def returns the app identifier as definition.
+func (a *TicTacToeApp) Def() channel.AppID {
+	return a.ID
 }
 
 func (a *TicTacToeApp) NewData() channel.Data {
