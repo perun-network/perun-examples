@@ -22,7 +22,6 @@ import (
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
-	ethwire "github.com/perun-network/perun-eth-backend/wire"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -54,6 +53,7 @@ func SetupPaymentClient(
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
 	assetaddr ethwallet.Address, // asset is the address of the asset holder for our payment channels.
+	wireAddr wire.Address, // wireAddr is the address of the wire account.
 ) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -88,9 +88,8 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	waddr := &ethwire.Address{Address: eaddress}
 
-	wireAddrs := map[wallet.BackendID]wire.Address{ethwallet.BackendID: waddr}
+	wireAddrs := map[wallet.BackendID]wire.Address{ethwallet.BackendID: wireAddr}
 	perunClient, err := client.New(wireAddrs, bus, funder, adj, map[wallet.BackendID]wallet.Wallet{ethwallet.BackendID: w}, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")

@@ -65,6 +65,7 @@ func setupPaymentClient(
 	adjudicator common.Address,
 	asset ethwallet.Address,
 	privateKey string,
+	wireAddr wire.Address,
 ) *client.PaymentClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
@@ -85,6 +86,7 @@ func setupPaymentClient(
 		chainID,
 		adjudicator,
 		asset,
+		wireAddr,
 	)
 	if err != nil {
 		panic(err)
