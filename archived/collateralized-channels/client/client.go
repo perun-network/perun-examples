@@ -118,9 +118,6 @@ func (c *Client) SendPayment(peer common.Address, amount *big.Int) (err error) {
 		challengeDuration := uint64(c.challengeDuration.Seconds())
 		collateralApp := app.NewCollateralApp(ewallet.AsWalletAddr(c.appAddress))
 		peers := []wire.Address{c.perunClient.Account.Address(), ewallet.AsWalletAddr(peer)}
-		if err != nil {
-			return errors.WithMessage(err, "creating peers")
-		}
 		withApp := client.WithApp(collateralApp, collateralApp.ZeroBalance())
 		prop, err := client.NewLedgerChannelProposal(challengeDuration, c.PerunAddress(), zeroBalance(c.assetHolderAddr), peers, withApp)
 		if err != nil {
@@ -159,7 +156,7 @@ func (c *Client) IncreaseChannelCollateral(peer common.Address, amount *big.Int)
 
 	ch, ok := c.channels[peer]
 	if !ok {
-		return errors.WithMessage(err, "getting channel")
+		return errors.New("channel not found")
 	}
 
 	return c.transactAndConfirm(func(tr *bind.TransactOpts) (*types.Transaction, error) {
@@ -176,7 +173,7 @@ func (c *Client) Settle(peer common.Address) (err error) {
 
 	ch, ok := c.channels[peer]
 	if !ok {
-		return errors.WithMessage(err, "getting channel")
+		return errors.Errorf("channel not found for peer: %s", peer.Hex())
 	}
 
 	err = c.settle(ch)

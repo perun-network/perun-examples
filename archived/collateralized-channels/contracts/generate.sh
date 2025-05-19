@@ -21,7 +21,7 @@ generate_bindings() {
     PKG=$CONTRACT_GO_NAME
     GENDIR=./generated/$PKG
     mkdir -p $GENDIR
-    $ABIGEN --pkg $PKG --sol $CONTRACT_SOL_FILE --out $GENDIR/$CONTRACT_GO_NAME.go --solc $SOLC
+    $ABIGEN --pkg "$PKG" --sol "$CONTRACT_SOL_FILE" --out "$GENDIR/$CONTRACT_GO_NAME.go" --solc "$SOLC"
 }
 
 generate_bindings ./Adjudicator.sol adjudicator
