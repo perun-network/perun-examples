@@ -89,6 +89,7 @@ func setupGameClient(
 	privateKey string,
 	app *app.TicTacToeApp,
 	stake channel.Bal,
+	wireAddr wire.Address,
 ) *client.AppClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
@@ -104,6 +105,7 @@ func setupGameClient(
 		bus,
 		w,
 		acc,
+		wireAddr,
 		eaddr,
 		nodeURL,
 		chainID,
