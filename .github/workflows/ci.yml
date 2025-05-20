@@ -106,7 +106,7 @@ jobs:
           ./stopdfx.sh || true # stop any running dfx
           ./startdeploy.sh
 
-          sleep 15
+          sleep 5
           go run ./
 
           ./stopdfx.sh || true

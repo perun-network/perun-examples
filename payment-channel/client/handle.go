@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
