@@ -11,6 +11,13 @@ git submodule init
 git submodule update
 ```
 
+## Archived Examples
+Examples that are no longer maintained or rely on outdated dependencies have been moved to the `/archived/` directory.
+
+These are retained for reference only and are **not actively tested or supported**.
+
+A dedicated workflow (`Archived Examples CI`) runs tests for these on-demand, but they are excluded from required checks.
+
 ## License
 
 The source code in this repository is made available under the Apache License, Version 2.0.
