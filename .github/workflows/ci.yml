@@ -48,6 +48,17 @@ jobs:
           go run .
           docker stop ganache
 
+      - name: App Channel
+        working-directory: app-channel
+        run: |
+          yarn
+          yarn add --dev hardhat
+
+          npx hardhat node &
+          sleep 5
+          go run .
+          pkill -f "hardhat node" || true
+
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
         run: |
@@ -85,15 +96,6 @@ jobs:
           go run .
           docker stop ganache
           docker stop stellar
-
-      - name: App Channel
-        working-directory: app-channel
-        run: |
-          yarn
-          npx hardhat node &
-          sleep 5
-          go run .
-          pkill -f "hardhat node" || true
 
       - name: Payment Channel ICP
         working-directory: payment-channel-icp
