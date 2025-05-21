@@ -4,6 +4,18 @@ This example shows how to set up a payment channel on Stellar, which utilizes th
 
 # Setup
 
+To install the docker image, you need to download and build it first, using the build.sh script in testdata/docker:
+
+```sh
+./testdata/docker/build.sh
+```
+
+or using `Makefile`
+
+```sh
+  make
+```
+
 Spin up the local Stellar blockchain, serving as a local testnet for demonstration purposes.
 
 ```
