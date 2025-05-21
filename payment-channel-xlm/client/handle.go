@@ -51,7 +51,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 
 	// Create a channel accept message and send it.
 	accept := lcp.Accept(
-		c.account.Address(),      // The account we use in the channel.
+		c.account,                // The account we use in the channel.
 		client.WithRandomNonce(), // Our share of the channel nonce.
 	)
 	ch, err := r.Accept(context.TODO(), accept)
@@ -106,7 +106,7 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
 func (c *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
-	log.Printf("Adjudicator event: type = %T, client = %v", e, c.account.Address())
+	log.Printf("Adjudicator event: type = %T, client = %v", e, c.account)
 }
 
 func (c *PaymentClient) GetChannel() (*PaymentChannel, error) {
