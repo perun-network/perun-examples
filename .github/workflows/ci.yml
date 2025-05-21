@@ -47,19 +47,18 @@ jobs:
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
         run: |
-          pkill -f quickstart.sh || true
+          docker stop stellar soroban-preview || true
           
           sleep 5
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
 
           chmod +x ./quickstart.sh
-          ./quickstart.sh standalone &
+          ./quickstart.sh standalone-detached 
 
           sleep 50
           go run ./
-          docker stop stellar
-          sleep 5
+          docker stop stellar soroban-preview 
 
       - name: Payment Channel Cross-Contract
         working-directory: payment-channel-cc
@@ -106,7 +105,7 @@ jobs:
           ./stopdfx.sh || true # stop any running dfx
           ./startdeploy.sh
 
-          sleep 15
+          sleep 5
           go run ./
 
           ./stopdfx.sh || true
