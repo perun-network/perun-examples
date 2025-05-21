@@ -59,10 +59,13 @@ docker run -d \
   --network soroban-network \
   soroban-preview:10
 
+echo "Cleaning up any existing stellar container"
+docker rm -f stellar 2>/dev/null || true
+
 # Start the stellar quickstart container
 if [[ "$DETACHED" == "1" ]]; then
   echo "Running stellar quickstart container in detached mode"
-  docker run -d \
+  docker run --rm -d \
     --name stellar \
     --pull always \
     --network soroban-network \

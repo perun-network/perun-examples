@@ -23,9 +23,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - uses: dfinity/setup-dfx@main
+      - name: Install Internet Computer SDK
+        uses: dfinity/setup-dfx@main
         with:
           dfx-version: 0.25.1
+
+      - name: Build Stellar Devchain Image
+        working-directory: payment-channel-xlm
+        run: |
+          chmod +x ./testdata/docker/build.sh
+          ./testdata/docker/build.sh
 
       - name: Pull ganache-cli image
         run: docker pull ${{ env.ganache-image }}
@@ -58,7 +65,7 @@ jobs:
 
           sleep 50
           go run ./
-          docker stop stellar soroban-preview 
+          docker stop stellar 
 
       - name: Payment Channel Cross-Contract
         working-directory: payment-channel-cc
@@ -105,7 +112,6 @@ jobs:
           ./stopdfx.sh || true # stop any running dfx
           ./startdeploy.sh
 
-          sleep 5
           go run ./
 
           ./stopdfx.sh || true
