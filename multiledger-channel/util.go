@@ -80,6 +80,7 @@ func setupPaymentClient(
 	bus wire.Bus,
 	privateKey string,
 	chains [2]client.ChainConfig,
+	waddress wire.Address, // waddress is the wire address of the client, used for off-chain communication.
 ) *client.SwapClient {
 	// Create wallet and account.
 	k, err := crypto.HexToECDSA(privateKey)
@@ -95,6 +96,7 @@ func setupPaymentClient(
 		w,
 		acc,
 		chains,
+		waddress,
 	)
 	if err != nil {
 		panic(err)

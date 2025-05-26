@@ -23,7 +23,9 @@ import (
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
-	"github.com/perun-network/perun-eth-backend/wire"
+
+	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire"
 )
 
 // CreateContractBackend creates a new contract backend.
@@ -45,10 +47,10 @@ func CreateContractBackend(
 
 // WalletAddress returns the wallet address of the client.
 func (c *SwapClient) WalletAddress() common.Address {
-	return common.Address(*c.account.(*ethwallet.Address))
+	return common.Address(*c.account[1].(*ethwallet.Address))
 }
 
 // WireAddress returns the wire address of the client.
-func (c *SwapClient) WireAddress() *wire.Address {
-	return &wire.Address{Address: ethwallet.AsWalletAddr(c.WalletAddress())}
+func (c *SwapClient) WireAddress() map[wallet.BackendID]wire.Address {
+	return c.waddresss
 }
