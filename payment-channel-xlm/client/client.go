@@ -48,7 +48,7 @@ func SetupPaymentClient(
 	wireAddr wire.Address,
 
 	stellarTokenIDs []channel.Asset,
-	bus *wire.LocalBus,
+	bus wire.Bus,
 	funder channel.Funder,
 	adj channel.Adjudicator,
 ) (*PaymentClient, error) {

@@ -56,7 +56,6 @@ func payment_example(setup *util.Setup) {
 	adjBob := setup.GetAdjudicators()[1]
 
 	log.Println("Initializing a connection between Alice and Bob")
-	bus := wire.NewLocalBus()
 
 	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
 	aliceNet, err := p2p.NewP2PBus(types.StellarBackendID, aliceWireAcc)
@@ -79,11 +78,11 @@ func payment_example(setup *util.Setup) {
 	aliceNet.Dialer.Register(map[wallet.BackendID]wire.Address{types.StellarBackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
 
 	log.Println("Setup payment clients for Alice and Bob")
-	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, aliceWireAcc.Address(), setup.GetTokenAsset(), bus, funderAlice, adjAlice)
+	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, aliceWireAcc.Address(), setup.GetTokenAsset(), aliceBus, funderAlice, adjAlice)
 	if err != nil {
 		panic(err)
 	}
-	bobPerun, err := client.SetupPaymentClient(wBob, accBob, bobWireAcc.Address(), setup.GetTokenAsset(), bus, funderBob, adjBob)
+	bobPerun, err := client.SetupPaymentClient(wBob, accBob, bobWireAcc.Address(), setup.GetTokenAsset(), bobBus, funderBob, adjBob)
 	if err != nil {
 		panic(err)
 	}
