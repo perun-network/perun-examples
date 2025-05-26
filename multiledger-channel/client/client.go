@@ -21,7 +21,6 @@ import (
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
-	ethwire "github.com/perun-network/perun-eth-backend/wire"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
@@ -63,6 +62,7 @@ func SetupSwapClient(
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
 	acc common.Address, // acc is the address of the account to be used for signing transactions.
 	chains [2]ChainConfig, // chains represent the two chains the client should be able to use.
+	waddress wire.Address, // waddress is the wire address of the client, used for off-chain communication.
 ) (*SwapClient, error) {
 	// The multi-funder and multi-adjudicator will be registered with a funder /
 	// adjudicators for each chain.
@@ -121,8 +121,7 @@ func SetupSwapClient(
 
 	// Setup Perun client.
 	walletAddr := ethwallet.AsWalletAddr(acc)
-	wireAddr := &ethwire.Address{Address: walletAddr}
-	addresses := map[wallet.BackendID]wire.Address{1: wireAddr}
+	addresses := map[wallet.BackendID]wire.Address{1: waddress}
 	ethWallet := map[wallet.BackendID]wallet.Wallet{1: w}
 	perunClient, err := client.New(addresses, bus, multiFunder, multiAdjudicator, ethWallet, watcher)
 	if err != nil {
