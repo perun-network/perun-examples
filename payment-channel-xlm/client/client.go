@@ -1,3 +1,17 @@
+// Copyright 2025 PolyCrypt GmbH
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package client
 
 import (
@@ -5,55 +19,61 @@ import (
 	"log"
 	"math/big"
 
-	"perun.network/go-perun/wire/net/simple"
-
 	"context"
 	"errors"
 
-	pchannel "perun.network/go-perun/channel"
-	pclient "perun.network/go-perun/client"
+	"perun.network/go-perun/channel"
+	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-stellar-backend/channel"
-	"perun.network/perun-stellar-backend/wallet"
+
+	stellarwallet "perun.network/perun-stellar-backend/wallet"
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 type PaymentClient struct {
-	perunClient *pclient.Client
-	account     *wallet.Account
-	currencies  []pchannel.Asset
+	perunClient *client.Client
+	account     map[wallet.BackendID]wallet.Address // The account we use for on-chain and off-chain transactions.
+	waddress    map[wallet.BackendID]wire.Address
+	currencies  []channel.Asset
 	channels    chan *PaymentChannel
 	Channel     *PaymentChannel
-	wAddr       wire.Address
 	balance     *big.Int
 }
 
 func SetupPaymentClient(
-	w *wallet.EphemeralWallet,
-	acc *wallet.Account,
-	stellarTokenIDs []pchannel.Asset,
-	bus *wire.LocalBus,
-	funder *channel.Funder,
-	adj *channel.Adjudicator,
+	w *stellarwallet.EphemeralWallet,
+	stellarAccount wallet.Account,
+	wireAddr wire.Address,
 
+	stellarTokenIDs []channel.Asset,
+	bus wire.Bus,
+	funder channel.Funder,
+	adj channel.Adjudicator,
 ) (*PaymentClient, error) {
 	watcher, err := local.NewWatcher(adj)
 	if err != nil {
 		return nil, fmt.Errorf("intializing watcher: %w", err)
 	}
 	// Setup Perun client.
-	wireAddr := simple.NewAddress(acc.Address().String())
-	perunClient, err := pclient.New(wireAddr, bus, funder, adj, w, watcher)
+	addresses := map[wallet.BackendID]wire.Address{types.StellarBackendID: wireAddr}
+	stellarWallet := map[wallet.BackendID]wallet.Wallet{types.StellarBackendID: w}
+
+	// Setup Accounts
+	account := map[wallet.BackendID]wallet.Address{types.StellarBackendID: stellarAccount.Address()}
+
+	perunClient, err := client.New(addresses, bus, funder, adj, stellarWallet, watcher)
 	if err != nil {
 		return nil, errors.New("creating client")
 	}
 
 	c := &PaymentClient{
 		perunClient: perunClient,
-		account:     acc,
+		account:     account,
+		waddress:    addresses,
 		currencies:  stellarTokenIDs,
 		channels:    make(chan *PaymentChannel, 1),
-		wAddr:       wireAddr,
 		balance:     big.NewInt(0),
 	}
 
@@ -62,7 +82,7 @@ func SetupPaymentClient(
 }
 
 // startWatching starts the dispute watcher for the specified channel.
-func (c *PaymentClient) startWatching(ch *pclient.Channel) {
+func (c *PaymentClient) startWatching(ch *client.Channel) {
 	go func() {
 		err := ch.Watch(c)
 		if err != nil {
@@ -71,21 +91,25 @@ func (c *PaymentClient) startWatching(ch *pclient.Channel) {
 	}()
 }
 
-func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balances) {
+func (c *PaymentClient) OpenChannel(peer map[wallet.BackendID]wire.Address, balances channel.Balances) {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 
-	participants := []wire.Address{c.WireAddress(), peer}
+	participants := []map[wallet.BackendID]wire.Address{c.waddress, peer}
 
-	initAlloc := pchannel.NewAllocation(2, c.currencies...)
+	backends := make([]wallet.BackendID, len(c.currencies))
+	for i := range c.currencies {
+		backends[i] = types.StellarBackendID
+	}
+	initAlloc := channel.NewAllocation(2, backends, c.currencies...)
 	initAlloc.Balances = balances
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
-	proposal, err := pclient.NewLedgerChannelProposal(
+	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
-		c.account.Address(),
+		c.account,
 		initAlloc,
 		participants,
 	)
@@ -104,8 +128,8 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balance
 	c.Channel = newPaymentChannel(ch, c.currencies)
 }
 
-func (p *PaymentClient) WireAddress() wire.Address {
-	return p.wAddr
+func (p *PaymentClient) WireAddress() map[wallet.BackendID]wire.Address {
+	return p.waddress
 }
 
 func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
