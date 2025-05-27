@@ -10,11 +10,10 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"perun.network/perun-ckb-backend/backend"
 	"perun.network/perun-ckb-backend/channel/asset"
+	"perun.network/perun-ckb-backend/channel/test"
 	"perun.network/perun-ckb-backend/wallet"
 	ckbwallet "perun.network/perun-ckb-backend/wallet"
-	ckbaddr "perun.network/perun-ckb-backend/wallet/address"
 	"perun.network/perun-examples/payment-channel-ckb/client"
-	"perun.network/perun-examples/payment-channel-ckb/deployment"
 )
 
 const (
@@ -23,14 +22,13 @@ const (
 
 // Setup contains all the necessary information for CKB payment channel setup.
 type Setup struct {
-	Deployment   backend.Deployment
-	SUDTInfo     deployment.SUDTInfo
-	Wallet       *ckbwallet.EphemeralWallet
-	WalletAccs   []*ckbwallet.Account
-	CKBAsset     asset.Asset
-	SudtAsset    asset.Asset
-	AccKeys      []*secp256k1.PrivateKey
-	Participants []ckbaddr.Participant
+	Deployment backend.Deployment
+	SUDTInfo   test.SUDTInfo
+	Wallet     *ckbwallet.EphemeralWallet
+	WalletAccs []*ckbwallet.Account
+	CKBAsset   asset.Asset
+	SudtAsset  asset.Asset
+	AccKeys    []*secp256k1.PrivateKey
 }
 
 // NewSetup creates a new Setup instance with the provided parameters.
@@ -42,7 +40,7 @@ func NewSetup() *Setup {
 		log.Fatalf("error getting SUDT owner lock arg: %v", err)
 	}
 
-	d, sudtInfo, err := deployment.GetDeployment("./devnet/contracts/migrations/dev/", "./devnet/system_scripts", sudtOwnerLockArg)
+	d, sudtInfo, err := test.GetDeployment("./devnet/contracts/migrations/dev/", "./devnet/contracts/migrations_vc/dev/", "./devnet/system_scripts", sudtOwnerLockArg)
 	if err != nil {
 		log.Fatalf("error getting deployment: %v", err)
 	}
@@ -51,19 +49,13 @@ func NewSetup() *Setup {
 	log.Println("Creating wallets")
 	w := wallet.NewEphemeralWallet()
 
-	keyAlice, err := deployment.GetKey("./devnet/accounts/alice.pk")
+	keyAlice, err := test.GetKey("./devnet/accounts/alice.pk")
 	if err != nil {
 		log.Fatalf("error getting alice's private key: %v", err)
 	}
-	keyBob, err := deployment.GetKey("./devnet/accounts/bob.pk")
+	keyBob, err := test.GetKey("./devnet/accounts/bob.pk")
 	if err != nil {
 		log.Fatalf("error getting bob's private key: %v", err)
-	}
-
-	pubKeys := []*secp256k1.PublicKey{keyAlice.PubKey(), keyBob.PubKey()}
-	parts, err := MakeParticipants(pubKeys)
-	if err != nil {
-		log.Fatalf("error creating participants: %v", err)
 	}
 
 	aliceAccount := wallet.NewAccountFromPrivateKey(keyAlice)
@@ -88,28 +80,14 @@ func NewSetup() *Setup {
 		SUDT:      asset.NewSUDT(*sudtInfo.Script, uint64(sudtMaxCapacity)),
 	}
 	return &Setup{
-		Deployment:   d,
-		SUDTInfo:     sudtInfo,
-		Wallet:       w,
-		WalletAccs:   []*ckbwallet.Account{aliceAccount, bobAccount},
-		CKBAsset:     ckbAsset,
-		SudtAsset:    sudtAsset,
-		AccKeys:      []*secp256k1.PrivateKey{keyAlice, keyBob},
-		Participants: parts,
+		Deployment: d,
+		SUDTInfo:   sudtInfo,
+		Wallet:     w,
+		WalletAccs: []*ckbwallet.Account{aliceAccount, bobAccount},
+		CKBAsset:   ckbAsset,
+		SudtAsset:  sudtAsset,
+		AccKeys:    []*secp256k1.PrivateKey{keyAlice, keyBob},
 	}
-}
-
-// MakeParticipants creates a list of participants from a list of public keys.
-func MakeParticipants(pks []*secp256k1.PublicKey) ([]ckbaddr.Participant, error) {
-	parts := make([]ckbaddr.Participant, len(pks))
-	for i := range pks {
-		part, err := ckbaddr.NewDefaultParticipant(pks[i])
-		if err != nil {
-			return nil, fmt.Errorf("unable to create participant: %w", err)
-		}
-		parts[i] = *part
-	}
-	return parts, nil
 }
 
 func parseSUDTOwnerLockArg(pathToSUDTOwnerLockArg string) (string, error) {

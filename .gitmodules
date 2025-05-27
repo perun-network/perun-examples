@@ -4,3 +4,6 @@
 [submodule "app-channel/contracts/perun-eth-contracts"]
 	path = app-channel/contracts/perun-eth-contracts
 	url = https://github.com/hyperledger-labs/perun-eth-contracts
+[submodule "payment-channel-ckb/devnet/contracts"]
+	path = payment-channel-ckb/devnet/contracts
+	url = git@github.com:perun-network/perun-ckb-contract.git

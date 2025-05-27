@@ -9,8 +9,8 @@ require (
 	github.com/nervosnetwork/ckb-sdk-go/v2 v2.2.0
 	github.com/perun-network/perun-libp2p-wire v0.2.2
 	github.com/stretchr/testify v1.10.0
-	perun.network/go-perun v0.12.0
-	perun.network/perun-ckb-backend v0.0.0-20241024114309-500054212d66
+	perun.network/go-perun v0.12.1-0.20250415090022-4d68d2869b94
+	perun.network/perun-ckb-backend v0.2.1-0.20250522121139-e42d79ef64a7
 	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37
 )
 
@@ -134,4 +134,4 @@ require (
 	lukechampine.com/blake3 v1.4.0 // indirect
 )
 
-replace github.com/nervosnetwork/ckb-sdk-go/v2 v2.2.0 => github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20241016165355-d1c9686fe018
+replace github.com/nervosnetwork/ckb-sdk-go/v2 v2.2.0 => github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20250414095541-e6244b21519c
