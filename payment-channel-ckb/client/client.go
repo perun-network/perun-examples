@@ -23,9 +23,7 @@ import (
 	"github.com/nervosnetwork/ckb-sdk-go/v2/rpc"
 	"github.com/nervosnetwork/ckb-sdk-go/v2/types"
 	"github.com/perun-network/perun-libp2p-wire/p2p"
-	"perun.network/go-perun/channel"
 	gpchannel "perun.network/go-perun/channel"
-	"perun.network/go-perun/channel/persistence"
 	"perun.network/go-perun/client"
 	gpwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
@@ -62,7 +60,6 @@ func NewPaymentClient(
 	account *wallet.Account,
 	key secp256k1.PrivateKey,
 	wallet *wallet.EphemeralWallet,
-	persistRestorer persistence.PersistRestorer,
 	wAddr wire.Address,
 	net *p2p.Net,
 
@@ -88,7 +85,6 @@ func NewPaymentClient(
 	if err != nil {
 		return nil, err
 	}
-	perunClient.EnablePersistence(persistRestorer)
 
 	balanceRPC, err := rpc.Dial(rpcUrl)
 	if err != nil {
@@ -215,30 +211,4 @@ func (p *PaymentClient) AcceptedChannel() *PaymentChannel {
 
 func (p *PaymentClient) Shutdown() {
 	p.PerunClient.Close()
-}
-
-func (c *PaymentClient) Restore(peer wire.Address, peerID string) []*PaymentChannel {
-	var restoredChannels []*client.Channel
-	//c.net.Dialer.Register(peer, peerID)
-	//TODO: Remove this hack. Find why asset is not found upon restoring
-	c.PerunClient.OnNewChannel(func(ch *client.Channel) {
-		restoredChannels = append(restoredChannels, ch)
-	})
-
-	err := c.PerunClient.Restore(context.TODO())
-	if err != nil {
-		fmt.Println("Error restoring channels")
-	}
-
-	paymentChannels := make([]*PaymentChannel, len(restoredChannels))
-	assets := make([]channel.Asset, 1)
-	assets = append(assets, &asset.Asset{
-		IsCKBytes: true,
-		SUDT:      nil,
-	})
-	for i, ch := range restoredChannels {
-		paymentChannels[i] = newPaymentChannel(ch, assets)
-	}
-
-	return paymentChannels
 }

@@ -23,6 +23,7 @@ send "Yes\r"
 expect "Password:"
 send "\r"
 expect eof
+wait
 EOF
 
 # Fetch default contracts:
