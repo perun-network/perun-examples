@@ -7,7 +7,7 @@ toolchain go1.23.4
 require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.1
 	github.com/perun-network/perun-libp2p-wire v1.0.1
-	github.com/perun-network/perun-polkadot-backend v0.2.1-0.20250528125705-46204d2b39b8
+	github.com/perun-network/perun-polkadot-backend v0.2.1-0.20250807110520-c2ee76f9bc68
 	github.com/pkg/errors v0.9.1
 	perun.network/go-perun v0.13.1-0.20250519120217-973104e7b38a
 )

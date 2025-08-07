@@ -246,6 +246,8 @@ github.com/perun-network/perun-libp2p-wire v1.0.1 h1:pNeCjGWddD0Fb8y+jdn4XQVoN/U
 github.com/perun-network/perun-libp2p-wire v1.0.1/go.mod h1:hIyG3pSboLYcaQr2yzpxNb6izvSsHi6iC50GaAfwvvE=
 github.com/perun-network/perun-polkadot-backend v0.2.1-0.20250528125705-46204d2b39b8 h1:cWvEnqljvgv91K8L5uVSOq4ycIByCiCuFJLRKrKc+MY=
 github.com/perun-network/perun-polkadot-backend v0.2.1-0.20250528125705-46204d2b39b8/go.mod h1:3We9brDl4hFvS7CxHidlmptnHbtW7195c60BOENVXEI=
+github.com/perun-network/perun-polkadot-backend v0.2.1-0.20250807110520-c2ee76f9bc68 h1:FH3F5nCBkBiUbMbfOqISJXz13yVv+HyWxEARdMvGKeE=
+github.com/perun-network/perun-polkadot-backend v0.2.1-0.20250807110520-c2ee76f9bc68/go.mod h1:3We9brDl4hFvS7CxHidlmptnHbtW7195c60BOENVXEI=
 github.com/pierrec/xxHash v0.1.5 h1:n/jBpwTHiER4xYvK3/CdPVnLDPchj8eTJFFLUb4QHBo=
 github.com/pierrec/xxHash v0.1.5/go.mod h1:w2waW5Zoa/Wc4Yqe0wgrIYAGKqRMf7czn2HNKXmuL+I=
 github.com/pion/datachannel v1.5.10 h1:ly0Q26K1i6ZkGf42W7D4hQYR90pZwzFOjTq5AuCKk4o=
