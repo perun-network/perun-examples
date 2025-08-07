@@ -30,6 +30,7 @@ import (
 // setupPaymentClient sets up a new client with the given parameters.
 func setupPaymentClient(
 	bus wire.Bus,
+	wireAcc wire.Account,
 	nodeURL string,
 	networkID dot.NetworkID,
 	queryDepth types.BlockNumber,
@@ -47,6 +48,7 @@ func setupPaymentClient(
 	c, err := client.SetupPaymentClient(
 		bus,
 		w,
+		wireAcc,
 		acc,
 		nodeURL,
 		networkID,

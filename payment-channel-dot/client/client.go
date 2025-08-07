@@ -23,6 +23,7 @@ import (
 	dotchannel "github.com/perun-network/perun-polkadot-backend/channel"
 	"github.com/perun-network/perun-polkadot-backend/channel/pallet"
 	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
+	pdotwallet "github.com/perun-network/perun-polkadot-backend/wallet"
 	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -36,17 +37,18 @@ import (
 
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
-	perunClient *client.Client // The core Perun client.
-	account     wallet.Account // The account we use for on-chain and off-chain transactions.
-	waddress    wire.Address
-	currency    channel.Asset        // The currency we expect to get paid in.
-	channels    chan *PaymentChannel // Accepted payment channels.
+	perunClient *client.Client                      // The core Perun client.
+	account     map[wallet.BackendID]wallet.Address // The account we use for on-chain and off-chain transactions.
+	waddress    map[wallet.BackendID]wire.Address   // The wire address we use for off-chain communication.
+	currency    channel.Asset                       // The currency we expect to get paid in.
+	channels    chan *PaymentChannel                // Accepted payment channels.
 }
 
 // SetupPaymentClient creates a new payment client.
 func SetupPaymentClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *dotwallet.Wallet, // w is the wallet used to resolve addresses to accounts for channels.
+	wireAcc wire.Account, // wireAcc is the account used for off-chain communication.
 	acc wallet.Account, // acc is the account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	networkID dot.NetworkID, // networkId is the identifier of the blockchain.
@@ -70,9 +72,10 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	waddr := &Address{Address: dotwallet.AsAddr(acc.Address())}
-
-	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	waddresses := map[wallet.BackendID]wire.Address{pdotwallet.BackendID: wireAcc.Address()}
+	wallets := map[wallet.BackendID]wallet.Wallet{pdotwallet.BackendID: w}
+	accs := map[wallet.BackendID]wallet.Address{pdotwallet.BackendID: acc.Address()}
+	perunClient, err := client.New(waddresses, bus, funder, adj, wallets, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
@@ -80,8 +83,8 @@ func SetupPaymentClient(
 	// Create client and start request handler.
 	c := &PaymentClient{
 		perunClient: perunClient,
-		account:     acc,
-		waddress:    waddr,
+		account:     accs,
+		waddress:    waddresses,
 		currency:    dotchannel.Asset,
 		channels:    make(chan *PaymentChannel, 1),
 	}
@@ -91,15 +94,15 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentChannel {
+func (c *PaymentClient) OpenChannel(peer map[wallet.BackendID]wire.Address, amount float64) *PaymentChannel {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	participants := []wire.Address{c.WireAddress(), peer}
+	participants := []map[wallet.BackendID]wire.Address{c.waddress, peer}
 
 	// We create an initial allocation which defines the starting balances.
 	initBal := DotToPlanck(big.NewFloat(amount))
-	initAlloc := channel.NewAllocation(2, dotchannel.Asset)
+	initAlloc := channel.NewAllocation(2, []wallet.BackendID{pdotwallet.BackendID}, dotchannel.Asset)
 	initAlloc.SetAssetBalances(dotchannel.Asset, []channel.Bal{
 		initBal, // Our initial balance.
 		initBal, // Peer's initial balance.
@@ -109,7 +112,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentC
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
-		c.account.Address(),
+		c.account,
 		initAlloc,
 		participants,
 	)
