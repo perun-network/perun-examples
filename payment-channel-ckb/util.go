@@ -14,6 +14,7 @@ import (
 	"perun.network/perun-ckb-backend/wallet"
 	ckbwallet "perun.network/perun-ckb-backend/wallet"
 	"perun.network/perun-examples/payment-channel-ckb/client"
+	"perun.network/perun-examples/payment-channel-ckb/deployment"
 )
 
 const (
@@ -23,11 +24,11 @@ const (
 // Setup contains all the necessary information for CKB payment channel setup.
 type Setup struct {
 	Deployment backend.Deployment
-	SUDTInfo   test.SUDTInfo
-	Wallet     *ckbwallet.EphemeralWallet
+	SUDTInfo   deployment.SUDTInfo
+	Wallets    []*ckbwallet.EphemeralWallet
 	WalletAccs []*ckbwallet.Account
-	CKBAsset   asset.Asset
-	SudtAsset  asset.Asset
+	CKBAsset   *asset.Asset
+	SudtAsset  *asset.Asset
 	AccKeys    []*secp256k1.PrivateKey
 }
 
@@ -40,14 +41,15 @@ func NewSetup() *Setup {
 		log.Fatalf("error getting SUDT owner lock arg: %v", err)
 	}
 
-	d, sudtInfo, err := test.GetDeployment("./devnet/contracts/migrations/dev/", "./devnet/contracts/migrations_vc/dev/", "./devnet/system_scripts", sudtOwnerLockArg)
+	d, sudtInfo, err := deployment.GetDeployment("./devnet/contracts/migrations/dev/", "./devnet/contracts/migrations_vc/dev/", "./devnet/system_scripts", sudtOwnerLockArg)
 	if err != nil {
 		log.Fatalf("error getting deployment: %v", err)
 	}
 
 	//Setup wallets
 	log.Println("Creating wallets")
-	w := wallet.NewEphemeralWallet()
+	wAlice := wallet.NewEphemeralWallet()
+	wBob := wallet.NewEphemeralWallet()
 
 	keyAlice, err := test.GetKey("./devnet/accounts/alice.pk")
 	if err != nil {
@@ -61,28 +63,28 @@ func NewSetup() *Setup {
 	aliceAccount := wallet.NewAccountFromPrivateKey(keyAlice)
 	bobAccount := wallet.NewAccountFromPrivateKey(keyBob)
 
-	err = w.AddAccount(aliceAccount)
+	err = wAlice.AddAccount(aliceAccount)
 	if err != nil {
 		log.Fatalf("error adding alice's account: %v", err)
 	}
-	err = w.AddAccount(bobAccount)
+	err = wBob.AddAccount(bobAccount)
 	if err != nil {
 		log.Fatalf("error adding bob's account: %v", err)
 	}
 
-	ckbAsset := asset.Asset{
+	ckbAsset := &asset.Asset{
 		IsCKBytes: true,
 		SUDT:      nil,
 	}
 
-	sudtAsset := asset.Asset{
+	sudtAsset := &asset.Asset{
 		IsCKBytes: false,
 		SUDT:      asset.NewSUDT(*sudtInfo.Script, uint64(sudtMaxCapacity)),
 	}
 	return &Setup{
 		Deployment: d,
 		SUDTInfo:   sudtInfo,
-		Wallet:     w,
+		Wallets:    []*ckbwallet.EphemeralWallet{wAlice, wBob},
 		WalletAccs: []*ckbwallet.Account{aliceAccount, bobAccount},
 		CKBAsset:   ckbAsset,
 		SudtAsset:  sudtAsset,

@@ -29,6 +29,7 @@ import (
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-ckb-backend/backend"
+	"perun.network/perun-ckb-backend/channel"
 	"perun.network/perun-ckb-backend/channel/adjudicator"
 	"perun.network/perun-ckb-backend/channel/asset"
 	"perun.network/perun-ckb-backend/channel/funder"
@@ -43,8 +44,8 @@ type PaymentClient struct {
 	Name         string
 	balance      *big.Int
 	sudtBalance  *big.Int
-	Account      *wallet.Account
-	wAddr        wire.Address
+	walletAccs   map[gpwallet.BackendID]gpwallet.Account
+	wireAddrs    map[gpwallet.BackendID]wire.Address
 	Network      types.Network
 	PerunClient  *client.Client
 	net          *p2p.Net
@@ -57,7 +58,7 @@ func NewPaymentClient(
 	network types.Network,
 	deployment backend.Deployment,
 	rpcUrl string,
-	account *wallet.Account,
+	walletAcc *wallet.Account,
 	key secp256k1.PrivateKey,
 	wallet *wallet.EphemeralWallet,
 	wAddr wire.Address,
@@ -68,7 +69,7 @@ func NewPaymentClient(
 	if err != nil {
 		return nil, err
 	}
-	signer := backend.NewSignerInstance(address.AsParticipant(account.Address()).ToCKBAddress(network), key, network)
+	signer := backend.NewSignerInstance(address.AsParticipant(walletAcc.Address()).ToCKBAddress(network), key, network)
 
 	ckbClient, err := ckbclient.NewClient(backendRPCClient, *signer, deployment)
 	if err != nil {
@@ -81,7 +82,15 @@ func NewPaymentClient(
 		return nil, err
 	}
 
-	perunClient, err := client.New(wAddr, net.Bus, f, a, wallet, watcher)
+	waddresses := map[gpwallet.BackendID]wire.Address{channel.CKBBackendID: wAddr}
+	wallets := map[gpwallet.BackendID]gpwallet.Wallet{
+		channel.CKBBackendID: wallet,
+	}
+	walletAccs := map[gpwallet.BackendID]gpwallet.Account{
+		channel.CKBBackendID: walletAcc,
+	}
+
+	perunClient, err := client.New(waddresses, net.Bus, f, a, wallets, watcher)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +103,8 @@ func NewPaymentClient(
 		Name:        name,
 		balance:     big.NewInt(0),
 		sudtBalance: big.NewInt(0),
-		Account:     account,
-		wAddr:       wAddr,
+		walletAccs:  walletAccs,
+		wireAddrs:   waddresses,
 		Network:     network,
 		PerunClient: perunClient,
 		channels:    make(chan *PaymentChannel, 1),
@@ -108,16 +117,20 @@ func NewPaymentClient(
 }
 
 // WalletAddress returns the wallet address of the client.
-func (p *PaymentClient) WalletAddress() gpwallet.Address {
-	return p.Account.Address()
+func (p *PaymentClient) WalletAddress() map[gpwallet.BackendID]gpwallet.Address {
+	addresses := make(map[gpwallet.BackendID]gpwallet.Address, len(p.walletAccs))
+	for backendID, acc := range p.walletAccs {
+		addresses[backendID] = acc.Address()
+	}
+	return addresses
 }
 
-func (p *PaymentClient) WireAddress() wire.Address {
-	return p.wAddr
+func (p *PaymentClient) WireAddress() map[gpwallet.BackendID]wire.Address {
+	return p.wireAddrs
 }
 
 func (p *PaymentClient) PeerID() string {
-	walletAddr := p.wAddr.(*p2p.Address)
+	walletAddr := p.wireAddrs[channel.CKBBackendID].(*p2p.Address)
 	return walletAddr.ID.String()
 }
 
@@ -134,22 +147,24 @@ func (p *PaymentClient) GetBalances() string {
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts map[gpchannel.Asset]float64) *PaymentChannel {
+func (p *PaymentClient) OpenChannel(peer map[gpwallet.BackendID]wire.Address, peerID string, amounts map[gpchannel.Asset]float64) *PaymentChannel {
 	// We define the channel participants. The proposer always has index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	participants := []wire.Address{p.WireAddress(), peer}
+	participants := []map[gpwallet.BackendID]wire.Address{p.WireAddress(), peer}
 	p.net.Dialer.Register(peer, peerID)
 
 	assets := make([]gpchannel.Asset, len(amounts))
+	backends := make([]gpwallet.BackendID, len(amounts))
 	i := 0
 	for a := range amounts {
 		assets[i] = a
+		backends[i] = channel.CKBBackendID
 		i++
 	}
 
 	// We create an initial allocation which defines the starting balances.
-	initAlloc := gpchannel.NewAllocation(2, assets...)
+	initAlloc := gpchannel.NewAllocation(2, backends, assets...)
 	for a, amount := range amounts {
 		switch a := a.(type) {
 		case *asset.Asset:
@@ -175,7 +190,7 @@ func (p *PaymentClient) OpenChannel(peer wire.Address, peerID string, amounts ma
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
-		p.Account.Address(),
+		p.WalletAddress(),
 		initAlloc,
 		participants,
 	)
