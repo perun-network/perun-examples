@@ -114,7 +114,7 @@ func main() {
 
 	//Bob sends payment
 	chBob.SendPayment(map[channel.Asset]float64{
-		setup.CKBAsset: 10.0,
+		setup.CKBAsset: 5.0,
 	})
 	log.Println("Bob sent Alice a payment")
 	printBalances(chAlice, assets)
