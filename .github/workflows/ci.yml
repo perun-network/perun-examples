@@ -141,6 +141,7 @@ jobs:
           C_INCLUDE_PATH: /usr/riscv64-linux-gnu/include
           CFLAGS: "-I/usr/riscv64-linux-gnu/include"
           TARGET_CFLAGS: "-I/usr/riscv64-linux-gnu/include"
+          GOFLAGS: "-tags=nosecp256k1"
         run: |
           sudo apt-get update
           sudo apt-get install -y jq sed gawk tmux tmuxp expect make libsecp256k1-dev
