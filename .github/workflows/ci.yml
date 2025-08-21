@@ -119,6 +119,18 @@ jobs:
           go run .
           docker stop polkadot
 
+
+      - name: Setup CKB Devnet
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf libc6-dev-riscv64-cross libc6-riscv64-cross linux-libc-dev-riscv64-cross
+          wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+          cargo install cargo-generate
+          rustup target add riscv64imac-unknown-none-elf
+
+          sudo ln -s /usr/riscv64-linux-gnu/include/gnu/stubs-lp64d.h /usr/riscv64-linux-gnu/include/gnu/stubs-lp64.h
+
+
       - name: Payment Channel CKB
         working-directory: payment-channel-ckb
         env:
@@ -131,14 +143,6 @@ jobs:
           TARGET_CFLAGS: "-I/usr/riscv64-linux-gnu/include"
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf libc6-dev-riscv64-cross libc6-riscv64-cross linux-libc-dev-riscv64-cross
-          wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-          cargo install cargo-generate
-          rustup target add riscv64imac-unknown-none-elf
-
-          sudo ln -s /usr/riscv64-linux-gnu/include/gnu/stubs-lp64d.h /usr/riscv64-linux-gnu/include/gnu/stubs-lp64.h
-
-          sudo apt-get update
           sudo apt-get install -y jq sed gawk tmux tmuxp expect make
           curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.201.0/ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
           tar -xzf ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
@@ -149,6 +153,7 @@ jobs:
           sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
           sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+
           cd ./devnet
           chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
           ./setup-devnet.sh
