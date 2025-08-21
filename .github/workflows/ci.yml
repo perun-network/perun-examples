@@ -143,7 +143,7 @@ jobs:
           TARGET_CFLAGS: "-I/usr/riscv64-linux-gnu/include"
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq sed gawk tmux tmuxp expect make
+          sudo apt-get install -y jq sed gawk tmux tmuxp expect make libsecp256k1-dev
           curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.201.0/ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
           tar -xzf ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
           sudo cp ckb_v0.201.0_x86_64-unknown-linux-gnu/ckb /usr/local/bin/
