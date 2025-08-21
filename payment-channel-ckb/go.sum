@@ -598,8 +598,6 @@ perun.network/go-perun v0.13.1-0.20250528124331-21b590b655d3 h1:vW6QhIoMwycG0fof
 perun.network/go-perun v0.13.1-0.20250528124331-21b590b655d3/go.mod h1:uH8iwi75alXDizxxDzH0A+6uqXPbagCpKfl8ECMv/cA=
 perun.network/perun-ckb-backend v0.2.1-0.20250603085027-d25a5eb09110 h1:NoQYXbpIrOSitgWLkKCr66iMMyeCABb8kTXSNkL45WE=
 perun.network/perun-ckb-backend v0.2.1-0.20250603085027-d25a5eb09110/go.mod h1:e2KkWOOPPYGFF6iRBMEhhL8ZmoaLRHntNnZeFt/Dt1Y=
-perun.network/perun-ckb-backend v0.2.1-0.20250730092035-bb238a5c3f43 h1:PtKSzX0a+vkAx66EH9O4KGb0lOyExvyUnkSzPWpbWPY=
-perun.network/perun-ckb-backend v0.2.1-0.20250730092035-bb238a5c3f43/go.mod h1:li8JHPkSAxPnXTE5qJf4YilYrrbiQw/57Y5WDdnCH8Y=
 polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37 h1:iA5GzEa/hHfVlQpimEjPV09NATwHXxSjWNB0VVodtew=
 polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37/go.mod h1:XUBrNtqgEhN3EEOP/5gh7IBd3xVHKidCjXDZfl9+kMU=
 rsc.io/tmplfunc v0.0.3 h1:53XFQh69AfOa8Tw0Jm7t+GV7KZhOi6jzsCzTtKbMvzU=
