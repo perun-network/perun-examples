@@ -123,6 +123,9 @@ jobs:
           sleep 10
           ./sudt_helper.sh balances
           cd ..
+          unset C_INCLUDE_PATH CFLAGS TARGET_CFLAGS
+          unset CC_riscv64imac_unknown_none_elf AR_riscv64imac_unknown_none_elf
+    
           go run main.go
           docker stop ganache
 
