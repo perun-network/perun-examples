@@ -47,6 +47,7 @@ jobs:
       - name: Install contract dependencies
         run: |
           sudo apt-get update
+          npm install -g @offckb/cli
           sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf libc6-dev-riscv64-cross libc6-riscv64-cross linux-libc-dev-riscv64-cross
           wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
           cargo install cargo-generate
@@ -84,7 +85,6 @@ jobs:
           curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.13.0/ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
           tar -xzf ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
           sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
-          npm install -g @offckb/cli
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
           sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
 
