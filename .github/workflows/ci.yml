@@ -82,6 +82,7 @@ jobs:
           curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.13.0/ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
           tar -xzf ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
           sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
+          npm install -g @offckb/cli
           wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
           sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
 
@@ -89,13 +90,13 @@ jobs:
           cd ./devnet
           chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
           ./setup-devnet.sh
-          ckb run > /dev/null 2>&1 &
+          offckb node > /dev/null 2>&1 &
           sleep 3
           ckb miner > /dev/null 2>&1 &
           sleep 3
           ./print_accounts.sh
           sleep 6
-          expect fund_accounts.expect
+          ./fund_omni_accounts.sh
           sleep 10
           ./deploy_contracts.sh
           sleep 15
