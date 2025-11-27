@@ -42,7 +42,6 @@ fund_address() {
 # Extract addresses
 alice=$(extract_address "$ACCOUNTS_DIR/alice.txt")
 bob=$(extract_address "$ACCOUNTS_DIR/bob.txt")
-ingrid=$(extract_address "$ACCOUNTS_DIR/ingrid.txt")
 alice_def=$(extract_address "$ACCOUNTS_DIR/alice_default.txt")
 bob_def=$(extract_address "$ACCOUNTS_DIR/bob_default.txt")
 
@@ -50,8 +49,6 @@ bob_def=$(extract_address "$ACCOUNTS_DIR/bob_default.txt")
 fund_address "$alice"
 sleep 5
 fund_address "$bob"
-sleep 5
-fund_address "$ingrid"
 sleep 5
 fund_address "$alice_def"
 sleep 5

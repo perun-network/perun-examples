@@ -18,12 +18,11 @@ check_files "$ACCOUNTS_DIR/alice.txt" "$ACCOUNTS_DIR/bob.txt" "$ACCOUNTS_DIR/gen
 
 ALICE=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/alice.txt")
 BOB=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/bob.txt")
-INGRID=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/ingrid.txt")
 GENESIS1=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/genesis-1.txt")
 GENESIS2=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/genesis-2.txt")
 
 fund_genesis() {
-  echo "Funding accounts for Alice, Bob and Ingrid with SUDT tokens"
+  echo "Funding accounts for Alice, Bob with SUDT tokens"
   SUDT_AMOUNT=200000000
 
   expect << EOF
