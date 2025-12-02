@@ -128,6 +128,11 @@ jobs:
     
           go run main.go
           docker stop ganache
+          sudo pkill -x ckb || true
+          sudo pkill -f offckb || true
+          sleep 1
+          sudo lsof /usr/local/bin/ckb || true
+          sudo rm -f /usr/local/bin/ckb || true
 
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
