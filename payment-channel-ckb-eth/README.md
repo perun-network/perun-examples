@@ -22,8 +22,12 @@ chmod +x ./print_accounts.sh
 chmod +x ./fund_omni_accounts.sh
 chmod +x ./deploy_contracts.sh
 chmod +x ./sudt_helper.sh
+cd ..
 ```
-
+Initialize the submodule.
+```sh
+git submodule update --init --recursive
+```
 Start the local CKB devnet:
 ```sh
 cd devnet
@@ -31,6 +35,6 @@ make dev
 ```
 
 Then run
-```
+```sh
 go run .
 ```
