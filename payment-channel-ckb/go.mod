@@ -7,7 +7,7 @@ toolchain go1.23.4
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/nervosnetwork/ckb-sdk-go/v2 v2.2.0
-	github.com/perun-network/perun-libp2p-wire v1.0.1
+	github.com/perun-network/perun-libp2p-wire v1.0.2
 	github.com/stretchr/testify v1.10.0
 	perun.network/go-perun v0.13.1-0.20250528124331-21b590b655d3
 	perun.network/perun-ckb-backend v0.2.1-0.20250603085027-d25a5eb09110

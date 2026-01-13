@@ -255,8 +255,8 @@ github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 h1:onHthvaw9LFnH4t2D
 github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58/go.mod h1:DXv8WO4yhMYhSNPKjeNKa5WY9YCIEBRbNzFFPJbWO6Y=
 github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20250729062233-916bd7327fac h1:fqMvGP4wpFP5OoZkDTSFPvVWP/7F/HMhCujxQwoxbAA=
 github.com/perun-network/ckb-sdk-go/v2 v2.2.1-0.20250729062233-916bd7327fac/go.mod h1:nPpBML8fuaM1NgkKCwv2gSHiCv+xKH43fu8LA9LOQUg=
-github.com/perun-network/perun-libp2p-wire v1.0.1 h1:pNeCjGWddD0Fb8y+jdn4XQVoN/UoXdUZbjfBgCI8KzQ=
-github.com/perun-network/perun-libp2p-wire v1.0.1/go.mod h1:hIyG3pSboLYcaQr2yzpxNb6izvSsHi6iC50GaAfwvvE=
+github.com/perun-network/perun-libp2p-wire v1.0.2 h1:ybtGznr1XKneKBIZUnwVbKvDDtO9uBKb1UGYAq8fZrw=
+github.com/perun-network/perun-libp2p-wire v1.0.2/go.mod h1:hIyG3pSboLYcaQr2yzpxNb6izvSsHi6iC50GaAfwvvE=
 github.com/pion/datachannel v1.5.10 h1:ly0Q26K1i6ZkGf42W7D4hQYR90pZwzFOjTq5AuCKk4o=
 github.com/pion/datachannel v1.5.10/go.mod h1:p/jJfC9arb29W7WrxyKbepTU20CFgyx5oLo8Rs4Py/M=
 github.com/pion/dtls/v2 v2.2.7/go.mod h1:8WiMkebSHFD0T+dIU+UeBaoV7kDhOW5oDCzZ7WZ/F9s=
