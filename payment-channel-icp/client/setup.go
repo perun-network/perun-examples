@@ -20,18 +20,20 @@ import (
 
 	"github.com/pkg/errors"
 	"perun.network/go-perun/client"
+	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
-	"perun.network/go-perun/wire/net/simple"
 	"perun.network/perun-icp-backend/channel"
 	chanconn "perun.network/perun-icp-backend/channel/connector"
 	"perun.network/perun-icp-backend/wallet"
+	icwallet "perun.network/perun-icp-backend/wallet"
 )
 
 func SetupPaymentClient(
 	name string,
 	w *wallet.FsWallet, // w is the wallet used to resolve addresses to accounts for channels.
-	bus *wire.LocalBus,
+	wireAcc wire.Account,
+	bus wire.Bus,
 	perunID string,
 	ledgerID string,
 	host string,
@@ -55,8 +57,13 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	wireAddr := simple.NewAddress(acc.Address().String())
-	perunClient, err := client.New(wireAddr, bus, funder, adj, w, watcher)
+	wallet := map[pwallet.BackendID]pwallet.Wallet{
+		icwallet.ICPBackendID: w,
+	}
+	wireAddr := map[pwallet.BackendID]wire.Address{
+		icwallet.ICPBackendID: wireAcc.Address(),
+	}
+	perunClient, err := client.New(wireAddr, bus, funder, adj, wallet, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
