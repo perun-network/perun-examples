@@ -22,6 +22,8 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+	icwallet "perun.network/perun-icp-backend/wallet"
 )
 
 // HandleProposal is the callback for incoming channel proposals.
@@ -57,7 +59,9 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 
 	// Create a channel accept message and send it.
 	accept := lcp.Accept(
-		c.account.Address(),      // The account we use in the channel.
+		map[wallet.BackendID]wallet.Address{
+			icwallet.ICPBackendID: c.account.Address(), // The account we use in the channel.
+		},
 		client.WithRandomNonce(), // Our share of the channel nonce.
 	)
 	ch, err := r.Accept(context.TODO(), accept)

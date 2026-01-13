@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,34 +15,28 @@
 package util
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"fmt"
-	"log"
 	mathrand "math/rand"
 	"path/filepath"
 	"runtime"
-	"time"
 
-	"github.com/stellar/go/clients/horizonclient"
+	pwallet "perun.network/go-perun/wallet"
+
 	"github.com/stellar/go/keypair"
-	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel"
+	"perun.network/perun-stellar-backend/channel/test"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
-	"perun.network/perun-stellar-backend/wire/scval"
 )
 
 const (
-	PerunContractPath        = "payment-channel-xlm/testdata/perun_soroban_multi_contract.wasm"
-	StellarAssetContractPath = "payment-channel-xlm/testdata/perun_soroban_token.wasm"
+	PerunContractPath        = "payment-channel-cc/testdata/perun_soroban_contract.wasm"
+	StellarAssetContractPath = "payment-channel-cc/testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
-	DefaultTestTimeout       = 30
 )
 
 type Setup struct {
@@ -99,9 +93,9 @@ func getDataFilePath(filename string) (string, error) {
 
 func NewExampleSetup() (*Setup, error) {
 
-	accs, kpsToFund, ws := MakeRandPerunAccsWallets(5)
+	accs, kpsToFund, ws := test.MakeRandPerunAccsWallets(5)
 
-	if err := CreateFundStellarAccounts(kpsToFund, initLumensBalance); err != nil {
+	if err := test.CreateFundStellarAccounts(kpsToFund, initLumensBalance); err != nil {
 		return nil, fmt.Errorf("error funding accounts: %w", err)
 	}
 
@@ -110,7 +104,7 @@ func NewExampleSetup() (*Setup, error) {
 
 	depTokenKps := []*keypair.Full{depTokenOneKp, depTokenTwoKp}
 
-	epPerunKp := kpsToFund[4]
+	depPerunKp := kpsToFund[4]
 
 	relPathPerun, err := getDataFilePath(PerunContractPath)
 	if err != nil {
@@ -121,20 +115,28 @@ func NewExampleSetup() (*Setup, error) {
 		return nil, fmt.Errorf("error getting asset contract path: %w", err)
 	}
 
-	perunAddress, _ := Deploy(epPerunKp, relPathPerun)
+	perunAddress, _ := Deploy(depPerunKp, relPathPerun)
 
 	tokenAddressOne, _ := Deploy(depTokenOneKp, relPathAsset)
 	tokenAddressTwo, _ := Deploy(depTokenTwoKp, relPathAsset)
 
 	tokenAddresses := []xdr.ScAddress{tokenAddressOne, tokenAddressTwo}
+	tokenVector, err := test.MakeCrossAssetVector(tokenAddresses)
+	if err != nil {
+		return nil, err
+	}
 
-	InitTokenContract(depTokenOneKp, tokenAddressOne)
-	InitTokenContract(depTokenTwoKp, tokenAddressTwo)
+	if err = test.InitTokenContract(depTokenOneKp, tokenAddressOne, client.HorizonURL); err != nil {
+		return nil, err
+	}
+
+	if err = test.InitTokenContract(depTokenTwoKp, tokenAddressTwo, client.HorizonURL); err != nil {
+		return nil, err
+	}
 
 	SetupAccountsAndContracts(depTokenKps, kpsToFund[:2], tokenAddresses, initTokenBalance)
 
 	var assetContractIDs []pchannel.Asset
-
 	for _, tokenAddress := range tokenAddresses {
 		assetContractID, err := types.NewStellarAssetFromScAddress(tokenAddress)
 		if err != nil {
@@ -143,7 +145,7 @@ func NewExampleSetup() (*Setup, error) {
 		assetContractIDs = append(assetContractIDs, assetContractID)
 	}
 
-	cbs := NewContractBackendsFromKeys(kpsToFund[:2])
+	cbs := test.NewContractBackendsFromKeys(kpsToFund[:2], []pwallet.Account{accs[0], accs[1]}, client.HorizonURL)
 
 	aliceCB := cbs[0]
 	aliceWallet := ws[0]
@@ -155,7 +157,7 @@ func NewExampleSetup() (*Setup, error) {
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddresses)
+	funders, adjs := test.CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenVector, false)
 
 	setup := Setup{
 		accs:     channelAccs,
@@ -177,161 +179,7 @@ func SetupAccountsAndContracts(deployerKps []*keypair.Full, kps []*keypair.Full,
 			if err != nil {
 				panic(err)
 			}
-			MintToken(deployerKps[i], tokenAddresses[i], tokenBalance, addr)
+			test.MintToken(deployerKps[i], tokenAddresses[i], tokenBalance, addr, client.HorizonURL)
 		}
 	}
-}
-func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
-	funders := make([]*channel.Funder, len(accs))
-	adjs := make([]*channel.Adjudicator, len(accs))
-
-	tokenVecAddresses := scval.MakeScVecFromScAddresses(tokenScAddresses)
-
-	for i, acc := range accs {
-		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenVecAddresses)
-		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenVecAddresses)
-	}
-	return funders, adjs
-}
-
-func NewContractBackendsFromKeys(kps []*keypair.Full) []*client.ContractBackend {
-	cbs := make([]*client.ContractBackend, len(kps))
-	// generate Configs
-	for i, kp := range kps {
-		cbs[i] = NewContractBackendFromKey(kp)
-	}
-	return cbs
-}
-
-func NewContractBackendFromKey(kp *keypair.Full) *client.ContractBackend {
-	trConfig := client.TransactorConfig{}
-	trConfig.SetKeyPair(kp)
-	return client.NewContractBackend(&trConfig)
-}
-
-func MakeRandPerunAccsWallets(count int) ([]*wallet.Account, []*keypair.Full, []*wallet.EphemeralWallet) {
-	accs := make([]*wallet.Account, count)
-	kps := make([]*keypair.Full, count)
-	ws := make([]*wallet.EphemeralWallet, count)
-
-	for i := 0; i < count; i++ {
-		acc, kp, w := MakeRandPerunAccWallet()
-		accs[i] = acc
-		kps[i] = kp
-		ws[i] = w
-	}
-	return accs, kps, ws
-}
-
-func MakeRandPerunAcc() (*wallet.Account, *keypair.Full) {
-	w := wallet.NewEphemeralWallet()
-
-	var b [8]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
-		panic(err)
-	}
-
-	seed := binary.LittleEndian.Uint64(b[:])
-
-	r := mathrand.New(mathrand.NewSource(int64(seed)))
-
-	acc, kp, err := w.AddNewAccount(r)
-	if err != nil {
-		panic(err)
-	}
-	return acc, kp
-}
-
-func MakeRandPerunAccWallet() (*wallet.Account, *keypair.Full, *wallet.EphemeralWallet) {
-	w := wallet.NewEphemeralWallet()
-
-	var b [8]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
-		panic(err)
-	}
-
-	seed := binary.LittleEndian.Uint64(b[:])
-
-	r := mathrand.New(mathrand.NewSource(int64(seed)))
-
-	acc, kp, err := w.AddNewAccount(r)
-	if err != nil {
-		panic(err)
-	}
-	return acc, kp, w
-}
-
-func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) error {
-
-	numKps := len(pairs)
-
-	masterClient := client.NewHorizonMasterClient()
-	masterHzClient := masterClient.GetHorizonClient()
-	sourceKey := keypair.Root(client.NETWORK_PASSPHRASE)
-
-	hzClient := client.NewHorizonClient()
-
-	ops := make([]txnbuild.Operation, numKps)
-
-	accReq := horizonclient.AccountRequest{AccountID: masterClient.GetAddress()}
-	sourceAccount, err := masterHzClient.AccountDetail(accReq)
-	if err != nil {
-		panic(err)
-	}
-
-	masterAccount := txnbuild.SimpleAccount{
-		AccountID: masterClient.GetAddress(),
-		Sequence:  sourceAccount.Sequence,
-	}
-
-	for i := 0; i < numKps; i++ {
-		pair := pairs[i]
-
-		ops[i] = &txnbuild.CreateAccount{
-			SourceAccount: masterAccount.AccountID,
-			Destination:   pair.Address(),
-			Amount:        initialBalance,
-		}
-	}
-
-	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee, ops...)
-
-	txSigned, err := client.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams)
-
-	if err != nil {
-		panic(err)
-	}
-	_, err = hzClient.SubmitTransaction(txSigned)
-	if err != nil {
-		panic(err)
-	}
-
-	accounts := make([]txnbuild.Account, numKps)
-	for i, kp := range pairs {
-		request := horizonclient.AccountRequest{AccountID: kp.Address()}
-		account, err := hzClient.AccountDetail(request)
-		if err != nil {
-			panic(err)
-		}
-
-		accounts[i] = &account
-	}
-
-	for _, keys := range pairs {
-		log.Printf("Funded Stellar L1 account %s (%s) with %s XLM.\n",
-			keys.Seed(), keys.Address(), initialBalance)
-	}
-
-	return nil
-}
-
-func (s *Setup) NewCtx(testTimeout float64) context.Context {
-	timeout := time.Duration(testTimeout * float64(time.Second))
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	if cancel != nil {
-		return nil
-	}
-	return ctx
 }

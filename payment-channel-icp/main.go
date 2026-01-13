@@ -17,8 +17,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
+	"time"
 
+	"github.com/perun-network/perun-libp2p-wire/p2p"
 	"perun.network/go-perun/channel"
+	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-examples/payment-channel-icp/client"
 	"perun.network/perun-icp-backend/wallet"
@@ -43,15 +47,33 @@ func main() {
 	perunWalletBob := wallet.NewWallet()
 
 	log.Println("Create communication channel between Alice and Bob")
-	bus := wire.NewLocalBus()
+	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	aliceNet, err := p2p.NewP2PBus(wallet.ICPBackendID, aliceWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	aliceBus := aliceNet.Bus
+	aliceListener := aliceNet.Listener
+	go aliceBus.Listen(aliceListener)
+
+	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	bobNet, err := p2p.NewP2PBus(wallet.ICPBackendID, bobWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	bobBus := bobNet.Bus
+	bobListener := bobNet.Listener
+	go bobBus.Listen(bobListener)
+
+	aliceNet.Dialer.Register(map[pwallet.BackendID]wire.Address{wallet.ICPBackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
 
 	log.Println("Setting up Payment Clients")
-	alice, err := client.SetupPaymentClient("Alice", perunWalletAlice, bus, perunPrincipal, ledgerPrincipal, Host, Port, userAPemPath)
+	alice, err := client.SetupPaymentClient("Alice", perunWalletAlice, aliceWireAcc, aliceBus, perunPrincipal, ledgerPrincipal, Host, Port, userAPemPath)
 	if err != nil {
 		panic(err)
 	}
 
-	bob, err := client.SetupPaymentClient("Bob", perunWalletBob, bus, perunPrincipal, ledgerPrincipal, Host, Port, userBPemPath)
+	bob, err := client.SetupPaymentClient("Bob", perunWalletBob, bobWireAcc, bobBus, perunPrincipal, ledgerPrincipal, Host, Port, userBPemPath)
 	if err != nil {
 		panic(err)
 	}

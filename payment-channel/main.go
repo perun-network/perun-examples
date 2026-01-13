@@ -16,8 +16,12 @@ package main
 
 import (
 	"log"
+	"math/rand"
+	"time"
 
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
+	"github.com/perun-network/perun-libp2p-wire/p2p"
+	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
 )
 
@@ -40,11 +44,31 @@ func main() {
 	adjudicator, assetHolder := deployContracts(chainURL, chainID, keyDeployer)
 	asset := *ethwallet.AsWalletAddr(assetHolder)
 
+	// Setup bus.
+	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	aliceNet, err := p2p.NewP2PBus(ethwallet.BackendID, aliceWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	aliceBus := aliceNet.Bus
+	aliceListener := aliceNet.Listener
+	go aliceBus.Listen(aliceListener)
+
+	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	bobNet, err := p2p.NewP2PBus(ethwallet.BackendID, bobWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	bobBus := bobNet.Bus
+	bobListener := bobNet.Listener
+	go bobBus.Listen(bobListener)
+
+	aliceNet.Dialer.Register(map[wallet.BackendID]wire.Address{ethwallet.BackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
+
 	// Setup clients.
 	log.Println("Setting up clients.")
-	bus := wire.NewLocalBus() // Message bus used for off-chain communication.
-	alice := setupPaymentClient(bus, chainURL, adjudicator, asset, keyAlice)
-	bob := setupPaymentClient(bus, chainURL, adjudicator, asset, keyBob)
+	alice := setupPaymentClient(aliceBus, chainURL, adjudicator, asset, keyAlice, aliceWireAcc.Address())
+	bob := setupPaymentClient(bobBus, chainURL, adjudicator, asset, keyBob, bobWireAcc.Address())
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL)

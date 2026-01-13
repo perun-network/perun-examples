@@ -25,6 +25,7 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	icwallet "perun.network/perun-icp-backend/wallet"
 )
 
 // PaymentChannel is a wrapper for a Perun channel for the payment use case.
@@ -107,8 +108,8 @@ func FormatState(c *PaymentChannel, state *channel.State) string {
 	balA, _ := bigFloatA.Float64()
 	balAStr := strconv.FormatFloat(balA, 'f', 4, 64)
 
-	fstPartyPaymentAddr := parties[0].String()
-	sndPartyPaymentAddr := parties[1].String()
+	fstPartyPaymentAddr := parties[0][icwallet.ICPBackendID].String()
+	sndPartyPaymentAddr := parties[1][icwallet.ICPBackendID].String()
 
 	bigIntB := state.Allocation.Balance(1, c.currency)
 	bigFloatB := new(big.Float).SetInt(bigIntB)
