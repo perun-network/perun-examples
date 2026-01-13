@@ -21,6 +21,7 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	ckbchannel "perun.network/perun-ckb-backend/channel"
 )
 
 // HandleProposal is the callback for incoming channel proposals.
@@ -102,5 +103,5 @@ func (p *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 
 // HandleAdjudicatorEvent is the callback for smart contract events.
 func (p *PaymentClient) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
-	log.Printf("Adjudicator event: type = %T, client = %v", e, p.Account)
+	log.Printf("Adjudicator event: type = %T, client = %v", e, p.WalletAddress()[ckbchannel.CKBBackendID])
 }
