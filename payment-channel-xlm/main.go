@@ -16,17 +16,26 @@ package main
 import (
 	"log"
 	"math/big"
+	"math/rand"
+	"time"
 
+	"github.com/perun-network/perun-libp2p-wire/p2p"
 	"perun.network/perun-examples/payment-channel-xlm/client"
 	"perun.network/perun-examples/payment-channel-xlm/util"
+	"perun.network/perun-stellar-backend/wallet/types"
 
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
 )
 
 func main() {
 	// Initialize setup (replaces the test setup)
 	log.Println("Starting initial setup")
+
+	// Setup clients.
+	log.Println("Setting up clients.")
+
 	setup, err := util.NewExampleSetup()
 	if err != nil {
 		panic(err)
@@ -47,13 +56,33 @@ func payment_example(setup *util.Setup) {
 	adjBob := setup.GetAdjudicators()[1]
 
 	log.Println("Initializing a connection between Alice and Bob")
-	bus := wire.NewLocalBus()
+
+	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	aliceNet, err := p2p.NewP2PBus(types.StellarBackendID, aliceWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	aliceBus := aliceNet.Bus
+	aliceListener := aliceNet.Listener
+	go aliceBus.Listen(aliceListener)
+
+	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	bobNet, err := p2p.NewP2PBus(types.StellarBackendID, bobWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	bobBus := bobNet.Bus
+	bobListener := bobNet.Listener
+	go bobBus.Listen(bobListener)
+
+	aliceNet.Dialer.Register(map[wallet.BackendID]wire.Address{types.StellarBackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
+
 	log.Println("Setup payment clients for Alice and Bob")
-	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, setup.GetTokenAsset(), bus, funderAlice, adjAlice)
+	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, aliceWireAcc.Address(), setup.GetTokenAsset(), aliceBus, funderAlice, adjAlice)
 	if err != nil {
 		panic(err)
 	}
-	bobPerun, err := client.SetupPaymentClient(wBob, accBob, setup.GetTokenAsset(), bus, funderBob, adjBob)
+	bobPerun, err := client.SetupPaymentClient(wBob, accBob, bobWireAcc.Address(), setup.GetTokenAsset(), bobBus, funderBob, adjBob)
 	if err != nil {
 		panic(err)
 	}
@@ -95,12 +124,7 @@ func printBalances(balances channel.Balances) {
 	log.Println("Channel Balances:")
 
 	// Manually print for Asset 1
-	log.Printf("Asset 1:\n")
+	log.Printf("Asset:\n")
 	log.Printf("  Alice: %s\n", balances[0][0].String())
 	log.Printf("  Bob: %s\n", balances[0][1].String())
-
-	// Manually print for Asset 2
-	log.Printf("Asset 2:\n")
-	log.Printf("  Alice: %s\n", balances[1][0].String())
-	log.Printf("  Bob: %s\n", balances[1][1].String())
 }

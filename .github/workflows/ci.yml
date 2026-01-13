@@ -22,9 +22,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - uses: dfinity/setup-dfx@main
+      - name: Install Internet Computer SDK
+        uses: dfinity/setup-dfx@main
         with:
-          dfx-version: 0.25.1
+          dfx-version: 0.24.0
+
+      - name: Build Stellar Devchain Image
+        working-directory: payment-channel-xlm
+        run: |
+          chmod +x ./testdata/docker/build.sh
+          ./testdata/docker/build.sh
 
       - name: Pull ganache-cli image
         run: docker pull ${{ env.ganache-image }}
@@ -59,19 +66,18 @@ jobs:
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
         run: |
-          pkill -f quickstart.sh || true
+          docker stop stellar soroban-preview || true
           
           sleep 5
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
 
           chmod +x ./quickstart.sh
-          ./quickstart.sh standalone &
+          ./quickstart.sh standalone-detached 
 
           sleep 50
           go run ./
-          docker stop stellar
-          sleep 5
+          docker stop stellar 
 
       - name: Payment Channel Cross-Contract
         working-directory: payment-channel-cc
@@ -113,7 +119,7 @@ jobs:
         working-directory: payment-channel-dot
         run: |
           docker run --name polkadot --detach --rm -it -p 9944:9944 ghcr.io/perun-network/polkadot-test-node:0.4.0
-          sleep 5
+          sleep 10
           go run .
           docker stop polkadot
 
