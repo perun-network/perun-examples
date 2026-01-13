@@ -16,7 +16,12 @@ package main
 
 import (
 	"log"
+	"math/rand"
+	"time"
 
+	"github.com/perun-network/perun-libp2p-wire/p2p"
+	"github.com/perun-network/perun-polkadot-backend/wallet"
+	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
 )
 
@@ -34,15 +39,37 @@ const (
 // available at `chainURL` and that the accounts corresponding to the specified
 // secret keys are provided with sufficient funds.
 func main() {
+
+	log.Println("Initializing a connection between Alice and Bob")
+
+	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	aliceNet, err := p2p.NewP2PBus(wallet.BackendID, aliceWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	aliceBus := aliceNet.Bus
+	aliceListener := aliceNet.Listener
+	go aliceBus.Listen(aliceListener)
+
+	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
+	bobNet, err := p2p.NewP2PBus(wallet.BackendID, bobWireAcc)
+	if err != nil {
+		log.Fatalf("creating p2p net: %v", err)
+	}
+	bobBus := bobNet.Bus
+	bobListener := bobNet.Listener
+	go bobBus.Listen(bobListener)
+
+	aliceNet.Dialer.Register(map[pwallet.BackendID]wire.Address{wallet.BackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
+
 	// Setup clients.
 	log.Println("Setting up clients.")
-	bus := wire.NewLocalBus() // Message bus used for off-chain communication.
-	alice := setupPaymentClient(bus, chainURL, networkID, blockQueryDepth, keyAlice)
-	bob := setupPaymentClient(bus, chainURL, networkID, blockQueryDepth, keyBob)
+	alice := setupPaymentClient(aliceBus, aliceWireAcc, chainURL, networkID, blockQueryDepth, keyAlice)
+	bob := setupPaymentClient(bobBus, bobWireAcc, chainURL, networkID, blockQueryDepth, keyBob)
 
 	// Print balances before transactions.
 	l := newBalanceLogger(chainURL, networkID)
-	l.LogBalances(alice.WalletAddress(), bob.WalletAddress())
+	l.LogBalances(alice.WalletAddress()[wallet.BackendID], bob.WalletAddress()[wallet.BackendID])
 
 	// Open channel, transact, close.
 	log.Println("Opening channel and depositing funds.")
@@ -59,7 +86,7 @@ func main() {
 	chBob.Settle(false)   // Withdraw.
 
 	// Print balances after transactions.
-	l.LogBalances(alice.WalletAddress(), bob.WalletAddress())
+	l.LogBalances(alice.WalletAddress()[wallet.BackendID], bob.WalletAddress()[wallet.BackendID])
 
 	// Cleanup.
 	alice.Shutdown()
