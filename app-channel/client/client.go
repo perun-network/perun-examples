@@ -22,7 +22,6 @@ import (
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
-	ethwire "github.com/perun-network/perun-eth-backend/wire"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -42,9 +41,9 @@ const (
 
 // AppClient is an app channel client.
 type AppClient struct {
-	perunClient *client.Client // The core Perun client.
-	account     wallet.Address // The account we use for on-chain and off-chain transactions.
-	waddress    wire.Address
+	perunClient *client.Client                      // The core Perun client.
+	account     map[wallet.BackendID]wallet.Address // The account we use for on-chain and off-chain transactions.
+	waddress    map[wallet.BackendID]wire.Address
 	currency    channel.Asset     // The currency we expect to get paid in.
 	stake       channel.Bal       // The amount we put at stake.
 	app         *app.TicTacToeApp // The app definition.
@@ -56,6 +55,7 @@ func SetupAppClient(
 	bus wire.Bus, // bus is used of off-chain communication.
 	w *swallet.Wallet, // w is the wallet used for signing transactions.
 	acc common.Address, // acc is the address of the account to be used for signing transactions.
+	waddr wire.Address, // waddr is the address of the account to be used for off-chain communication.
 	eaddress *ethwallet.Address, // eaddress is the address of the Ethereum account to be used for signing transactions.
 	nodeURL string, // nodeURL is the URL of the blockchain node.
 	chainID uint64, // chainID is the identifier of the blockchain.
@@ -82,13 +82,13 @@ func SetupAppClient(
 
 	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
-	dep := ethchannel.NewETHDepositor()
+	dep := ethchannel.NewETHDepositor(50000)
 	ethAcc := accounts.Account{Address: acc}
 	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
 	funder.RegisterAsset(*asset, dep, ethAcc)
 
 	// Setup adjudicator.
-	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc, 1000000)
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
@@ -97,17 +97,19 @@ func SetupAppClient(
 	}
 
 	// Setup Perun client.
-	waddr := &ethwire.Address{Address: eaddress}
-	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+	wireAddrs := map[wallet.BackendID]wire.Address{ethwallet.BackendID: waddr}
+	perunClient, err := client.New(wireAddrs, bus, funder, adj, map[wallet.BackendID]wallet.Wallet{ethwallet.BackendID: w}, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
+	eAddrs := map[wallet.BackendID]wallet.Address{ethwallet.BackendID: eaddress}
+
 	// Create client and start request handler.
 	c := &AppClient{
 		perunClient: perunClient,
-		account:     eaddress,
-		waddress:    waddr,
+		account:     eAddrs,
+		waddress:    wireAddrs,
 		currency:    asset,
 		stake:       stake,
 		app:         app,
@@ -121,11 +123,11 @@ func SetupAppClient(
 }
 
 // OpenAppChannel opens a new app channel with the specified peer.
-func (c *AppClient) OpenAppChannel(peer wire.Address) *TicTacToeChannel {
-	participants := []wire.Address{c.waddress, peer}
+func (c *AppClient) OpenAppChannel(peer map[wallet.BackendID]wire.Address) *TicTacToeChannel {
+	participants := []map[wallet.BackendID]wire.Address{c.waddress, peer}
 
 	// We create an initial allocation which defines the starting balances.
-	initAlloc := channel.NewAllocation(2, c.currency)
+	initAlloc := channel.NewAllocation(2, []wallet.BackendID{ethwallet.BackendID}, c.currency)
 	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
 		c.stake, // Our initial balance.
 		c.stake, // Peer's initial balance.
