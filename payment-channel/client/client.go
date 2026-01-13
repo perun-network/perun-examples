@@ -22,7 +22,6 @@ import (
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
-	ethwire "github.com/perun-network/perun-eth-backend/wire"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -37,9 +36,9 @@ import (
 
 // PaymentClient is a payment channel client.
 type PaymentClient struct {
-	perunClient *client.Client // The core Perun client.
-	account     wallet.Address // The account we use for on-chain and off-chain transactions.
-	waddress    wire.Address
+	perunClient *client.Client                      // The core Perun client.
+	account     map[wallet.BackendID]wallet.Address // The account we use for on-chain and off-chain transactions.
+	waddress    map[wallet.BackendID]wire.Address
 	currency    channel.Asset        // The currency we expect to get paid in.
 	channels    chan *PaymentChannel // Accepted payment channels.
 }
@@ -54,6 +53,7 @@ func SetupPaymentClient(
 	chainID uint64, // chainID is the identifier of the blockchain.
 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
 	assetaddr ethwallet.Address, // asset is the address of the asset holder for our payment channels.
+	wireAddr wire.Address, // wireAddr is the address of the wire account.
 ) (*PaymentClient, error) {
 	// Create Ethereum client and contract backend.
 	cb, err := CreateContractBackend(nodeURL, chainID, w)
@@ -73,13 +73,13 @@ func SetupPaymentClient(
 
 	// Setup funder.
 	funder := ethchannel.NewFunder(cb)
-	dep := ethchannel.NewETHDepositor()
+	dep := ethchannel.NewETHDepositor(50000)
 	ethAcc := accounts.Account{Address: acc}
 	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
 	funder.RegisterAsset(*asset, dep, ethAcc)
 
 	// Setup adjudicator.
-	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
+	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc, 1000000)
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
@@ -88,17 +88,20 @@ func SetupPaymentClient(
 	}
 
 	// Setup Perun client.
-	waddr := &ethwire.Address{Address: eaddress}
-	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
+
+	wireAddrs := map[wallet.BackendID]wire.Address{ethwallet.BackendID: wireAddr}
+	perunClient, err := client.New(wireAddrs, bus, funder, adj, map[wallet.BackendID]wallet.Wallet{ethwallet.BackendID: w}, watcher)
 	if err != nil {
 		return nil, errors.WithMessage(err, "creating client")
 	}
 
+	eAddrs := map[wallet.BackendID]wallet.Address{ethwallet.BackendID: eaddress}
+
 	// Create client and start request handler.
 	c := &PaymentClient{
 		perunClient: perunClient,
-		account:     eaddress,
-		waddress:    waddr,
+		account:     eAddrs,
+		waddress:    wireAddrs,
 		currency:    asset,
 		channels:    make(chan *PaymentChannel, 1),
 	}
@@ -108,14 +111,14 @@ func SetupPaymentClient(
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) *PaymentChannel {
+func (c *PaymentClient) OpenChannel(peer map[wallet.BackendID]wire.Address, amount float64) *PaymentChannel {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	participants := []wire.Address{c.waddress, peer}
+	participants := []map[wallet.BackendID]wire.Address{c.waddress, peer}
 
 	// We create an initial allocation which defines the starting balances.
-	initAlloc := channel.NewAllocation(2, c.currency)
+	initAlloc := channel.NewAllocation(2, []wallet.BackendID{ethwallet.BackendID}, c.currency)
 	initAlloc.SetAssetBalances(c.currency, []channel.Bal{
 		EthToWei(big.NewFloat(amount)), // Our initial balance.
 		big.NewInt(0),                  // Peer's initial balance.
