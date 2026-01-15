@@ -23,12 +23,12 @@ import (
 )
 
 // WalletAddress returns the wallet address of the client.
-func (c *PaymentClient) WalletAddress() wallet.Address {
-	return c.account.Address()
+func (c *PaymentClient) WalletAddress() map[wallet.BackendID]wallet.Address {
+	return c.account
 }
 
 // WireAddress returns the wire address of the client.
-func (c *PaymentClient) WireAddress() wire.Address {
+func (c *PaymentClient) WireAddress() map[wallet.BackendID]wire.Address {
 	return c.waddress
 }
 

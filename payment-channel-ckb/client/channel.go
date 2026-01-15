@@ -20,6 +20,7 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/perun-ckb-backend/channel/asset"
 )
 
 type PaymentChannel struct {
@@ -46,14 +47,21 @@ func (c PaymentChannel) SendPayment(amounts map[channel.Asset]float64) {
 		actor := c.ch.Idx()
 		peer := 1 - actor
 		for a, amount := range amounts {
-
 			if amount < 0 {
 				continue
 			}
-
-			shannonAmount := CKByteToShannon(big.NewFloat(amount))
-			state.Allocation.TransferBalance(actor, peer, a, shannonAmount)
-
+			switch a := a.(type) {
+			case *asset.Asset:
+				if a.IsCKBytes {
+					shannonAmount := CKByteToShannon(big.NewFloat(amount))
+					state.Allocation.TransferBalance(actor, peer, a, shannonAmount)
+				} else {
+					sudtAmmount := new(big.Int).SetUint64(uint64(amount))
+					state.Allocation.TransferBalance(actor, peer, a, sudtAmmount)
+				}
+			default:
+				panic("Asset is not of type *asset.Asset")
+			}
 		}
 
 	})

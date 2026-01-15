@@ -38,9 +38,7 @@ fi
 # Build all required contracts for Perun.
 DEVNET=$(pwd)
 cd $PERUN_CONTRACTS_DIR
-capsule build --release
-# If debug contracts are wanted:
-# capsule build
+source ./setup_env.sh build && make build
 cd $DEVNET
 
 # Genesis cell #1
@@ -76,11 +74,15 @@ ckb init --chain dev --ba-arg $MINER_LOCK_ARG --ba-message "0x" --force
 
 # Make the scripts owned by the miner.
 sed -i "s/args =.*$/args = \"$MINER_LOCK_ARG\"/" $PERUN_CONTRACTS_DIR/deployment/dev/deployment.toml
+sed -i "s/args =.*$/args = \"$MINER_LOCK_ARG\"/" $PERUN_CONTRACTS_DIR/deployment/dev/deployment_vc.toml
 # Use the debug versions of the contracts.
 # sed -i "s/release/debug/" $PERUN_CONTRACTS_DIR/deployment/dev/deployment.toml
 
 # Adjust miner config to process blocks faster.
 sed -i 's/value = 5000/value = 1000/' ckb-miner.toml
+
+# Fast mining config
+sed -i '/\[mining\]/a always_submit_block = true' ckb.toml
 
 # Reduce epoch length to 10 blocks.
 sed -i 's/genesis_epoch_length = 1000/genesis_epoch_length = 10/' specs/dev.toml

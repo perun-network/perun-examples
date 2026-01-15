@@ -26,6 +26,7 @@ import (
 
 	"github.com/nervosnetwork/ckb-sdk-go/v2/indexer"
 	"github.com/nervosnetwork/ckb-sdk-go/v2/types"
+	"perun.network/perun-ckb-backend/channel"
 	"perun.network/perun-ckb-backend/wallet/address"
 )
 
@@ -45,7 +46,7 @@ func sudtBalanceExtractor(cell *indexer.LiveCell) *big.Int {
 func (p *PaymentClient) PollBalances() {
 	pollingInterval := time.Second
 	searchKey := &indexer.SearchKey{
-		Script:           address.AsParticipant(p.Account.Address()).PaymentScript,
+		Script:           address.AsParticipant(p.WalletAddress()[channel.CKBBackendID]).PaymentScript,
 		ScriptType:       types.ScriptTypeLock,
 		ScriptSearchMode: types.ScriptSearchModeExact,
 		Filter:           nil,

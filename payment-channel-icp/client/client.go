@@ -22,6 +22,8 @@ import (
 
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-icp-backend/channel"
 	chanconn "perun.network/perun-icp-backend/channel/connector"
@@ -40,7 +42,7 @@ type PaymentClient struct {
 	observerMutex sync.Mutex
 	balanceMutex  sync.Mutex
 	Name          string
-	wAddr         wire.Address
+	wAddr         map[pwallet.BackendID]wire.Address
 	balance       *big.Int
 }
 
@@ -55,17 +57,17 @@ func (c *PaymentClient) startWatching(ch *client.Channel) {
 }
 
 // OpenChannel opens a new channel with the specified peer and funding.
-func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*PaymentChannel
+func (c *PaymentClient) OpenChannel(peer map[pwallet.BackendID]wire.Address, amount float64) { //*PaymentChannel
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 
-	participants := []wire.Address{c.WireAddress(), peer}
+	participants := []map[pwallet.BackendID]wire.Address{c.WireAddress(), peer}
 
 	// We create an initial allocation which defines the starting balances.
 	initBal := big.NewInt(int64(amount))
 
-	initAlloc := pchannel.NewAllocation(2, channel.Asset)
+	initAlloc := pchannel.NewAllocation(2, []pwallet.BackendID{icwallet.ICPBackendID}, channel.Asset)
 	initAlloc.SetAssetBalances(channel.Asset, []pchannel.Bal{
 		initBal, // Our initial balance.
 		initBal, // Peer's initial balance.
@@ -75,7 +77,9 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*Paym
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := client.NewLedgerChannelProposal(
 		challengeDuration,
-		c.account.Address(),
+		map[wallet.BackendID]wallet.Address{
+			icwallet.ICPBackendID: c.account.Address(),
+		},
 		initAlloc,
 		participants,
 	)
@@ -94,7 +98,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*Paym
 	c.Channel = newPaymentChannel(ch, c.currency)
 }
 
-func (p *PaymentClient) WireAddress() wire.Address {
+func (p *PaymentClient) WireAddress() map[pwallet.BackendID]wire.Address {
 	return p.wAddr
 }
 
@@ -117,7 +121,7 @@ func (c *PaymentClient) GetChannelBalance() (*big.Int, error) {
 
 	chanParams := c.Channel.GetChannelParams()
 	cid := chanParams.ID()
-	addr := chanParams.Parts[c.Channel.ch.Idx()]
+	addr := chanParams.Parts[c.Channel.ch.Idx()][icwallet.ICPBackendID]
 	addrBytes, err := addr.MarshalBinary()
 	if err != nil {
 		panic(err)

@@ -13,7 +13,6 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: '1.23'
-
       - uses: actions/cache@v3
         with:
           path: |
@@ -23,9 +22,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - uses: dfinity/setup-dfx@main
+      - name: Install Internet Computer SDK
+        uses: dfinity/setup-dfx@main
         with:
-          dfx-version: 0.25.1
+          dfx-version: 0.24.0
+
+      - name: Build Stellar Devchain Image
+        working-directory: payment-channel-xlm
+        run: |
+          chmod +x ./testdata/docker/build.sh
+          ./testdata/docker/build.sh
 
       - name: Pull ganache-cli image
         run: docker pull ${{ env.ganache-image }}
@@ -43,7 +49,39 @@ jobs:
           sleep 5
           go run .
           docker stop ganache
+      
+      - name: Multiledger Payment Channel
+        working-directory: multiledger-channel
+        env:
+          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+          BALANCE: "10000000000000000000"
+                  CHAIN_A_PORT: "8545"
+          CHAIN_B_PORT: "8546"
+          CHAIN_A_ID: "1337"
+          CHAIN_B_ID: "1338"
+        run: |
+          docker run --rm --name ganache-a --detach --publish $CHAIN_A_PORT:$CHAIN_A_PORT ${{ env.ganache-image }} --port $CHAIN_A_PORT --chain.chainId $CHAIN_A_ID --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=1
+          docker run --rm --name ganache-b --detach --publish $CHAIN_B_PORT:$CHAIN_B_PORT ${{ env.ganache-image }} --port $CHAIN_B_PORT --chain.chainId $CHAIN_B_ID --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=1
+          sleep 5
+          go run .
+          docker stop ganache-a
+          docker stop ganache-b
+          
+      - name: App Channel
+        working-directory: app-channel
+        run: |
+          docker build -t appchannel-devnet .
 
+          docker run --rm --name appchannel-devnet \
+          -d -p 8545:8545 \
+          appchannel-devnet
+
+          sleep 5
+          go run .
+          docker stop appchannel-devnet
+  
       - name: Install contract dependencies
         run: |
           sudo apt-get update
@@ -137,19 +175,18 @@ jobs:
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
         run: |
-          pkill -f quickstart.sh || true
+          docker stop stellar soroban-preview || true
           
           sleep 5
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
 
           chmod +x ./quickstart.sh
-          ./quickstart.sh standalone &
+          ./quickstart.sh standalone-detached 
 
           sleep 50
           go run ./
-          docker stop stellar
-          sleep 5
+          docker stop stellar 
 
       - name: Payment Channel Cross-Contract
         working-directory: payment-channel-cc
@@ -172,20 +209,6 @@ jobs:
           docker stop ganache
           docker stop stellar
 
-      - name: App Channel
-        working-directory: app-channel
-        env:
-          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
-          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
-          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
-          BALANCE: "10000000000000000000"
-        run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }}  --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
-
-          sleep 5
-          go run .
-          docker stop ganache
-
       - name: Payment Channel ICP
         working-directory: payment-channel-icp
         run: |
@@ -196,7 +219,7 @@ jobs:
           ./stopdfx.sh || true # stop any running dfx
           ./startdeploy.sh
 
-          sleep 15
+          sleep 5
           go run ./
 
           ./stopdfx.sh || true
@@ -205,43 +228,65 @@ jobs:
         working-directory: payment-channel-dot
         run: |
           docker run --name polkadot --detach --rm -it -p 9944:9944 ghcr.io/perun-network/polkadot-test-node:0.4.0
-          sleep 5
+          sleep 10
           go run .
           docker stop polkadot
 
+
+      - name: Install CKB contract dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf libc6-dev-riscv64-cross libc6-riscv64-cross linux-libc-dev-riscv64-cross
+          wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+          cargo install cargo-generate
+          rustup target add riscv64imac-unknown-none-elf
+
+      - name: Create Symlink
+        run: sudo ln -s /usr/riscv64-linux-gnu/include/gnu/stubs-lp64d.h /usr/riscv64-linux-gnu/include/gnu/stubs-lp64.h
+
+      - name: Start devnet in background
+        working-directory: payment-channel-ckb
+        env:
+          RUSTFLAGS: "-C linker=rust-lld"
+          CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_LINKER: rust-lld
+          CC_riscv64imac_unknown_none_elf: riscv64-unknown-elf-gcc
+          AR_riscv64imac_unknown_none_elf: riscv64-unknown-elf-ar
+          C_INCLUDE_PATH: /usr/riscv64-linux-gnu/include
+          CFLAGS: "-I/usr/riscv64-linux-gnu/include"
+          TARGET_CFLAGS: "-I/usr/riscv64-linux-gnu/include"
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y jq sed gawk tmux tmuxp expect make
+            curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.201.0/ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
+            tar -xzf ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
+            sudo cp ckb_v0.201.0_x86_64-unknown-linux-gnu/ckb /usr/local/bin/
+            curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.4.0/ckb-cli_v1.4.0_x86_64-unknown-linux-gnu.tar.gz
+            curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.13.0/ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
+            tar -xzf ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
+            sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
+            wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+            sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+
+            git submodule update --init --recursive
+            cd ./devnet
+            chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
+            ./setup-devnet.sh
+            ckb run > /dev/null 2>&1 &
+            sleep 3
+            ckb miner > /dev/null 2>&1 &
+            sleep 3
+            ./print_accounts.sh
+            sleep 6
+            expect fund_accounts.expect
+            sleep 10
+            ./deploy_contracts.sh
+            sleep 15
+            ./sudt_helper.sh fund
+            sleep 10
+            ./sudt_helper.sh balances
+            cd ../..
       - name: Payment Channel CKB
         working-directory: payment-channel-ckb
         run: |
-          sudo apt-get update
-          sudo apt-get install -y jq sed gawk tmux tmuxp expect make
-          curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.109.0/ckb_v0.109.0_x86_64-unknown-linux-gnu.tar.gz
-          tar -xzf ckb_v0.109.0_x86_64-unknown-linux-gnu.tar.gz
-          sudo cp ckb_v0.109.0_x86_64-unknown-linux-gnu/ckb /usr/local/bin/
-          curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.4.0/ckb-cli_v1.4.0_x86_64-unknown-linux-gnu.tar.gz
-          tar -xzf ckb-cli_v1.4.0_x86_64-unknown-linux-gnu.tar.gz
-          sudo cp ckb-cli_v1.4.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
-          curl -LO https://github.com/nervosnetwork/capsule/releases/download/v0.9.2/capsule_v0.9.2_x86_64-linux.tar.gz
-          tar -xzf capsule_v0.9.2_x86_64-linux.tar.gz
-          sudo cp capsule_v0.9.2_x86_64-linux/capsule /usr/local/bin/
-          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
-          cd ./devnet
-          chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
-          ./setup-devnet.sh
-          ckb run > /dev/null 2>&1 &
-          sleep 3
-          ckb miner > /dev/null 2>&1 &
-          sleep 3
-          ./print_accounts.sh
-          sleep 6
-          expect fund_accounts.expect
-          sleep 10
-          ./deploy_contracts.sh
-          sleep 15
-          ./sudt_helper.sh fund
-          sleep 10
-          ./sudt_helper.sh balances
-
           sleep 30
-          cd ..
-          go run main.go
+          go run .
