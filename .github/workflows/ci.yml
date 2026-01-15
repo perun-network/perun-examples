@@ -49,7 +49,7 @@ jobs:
           sleep 5
           go run .
           docker stop ganache
-
+      
       - name: Multiledger Payment Channel
         working-directory: multiledger-channel
         env:
@@ -68,6 +68,7 @@ jobs:
           go run .
           docker stop ganache-a
           docker stop ganache-b
+          
       - name: App Channel
         working-directory: app-channel
         run: |
@@ -80,6 +81,96 @@ jobs:
           sleep 5
           go run .
           docker stop appchannel-devnet
+  
+      - name: Install contract dependencies
+        run: |
+          sudo apt-get update
+
+          # offCKB CLI (node deps build now, before we touch RISC-V env)
+          npm install -g @offckb/cli
+
+          # RISC-V toolchain like locally
+          sudo apt-get install -y \
+            gcc-riscv64-unknown-elf \
+            binutils-riscv64-unknown-elf \
+            libc6-dev-riscv64-cross \
+            libc6-riscv64-cross \
+            linux-libc-dev-riscv64-cross
+
+          # LLVM 18 (for lld, same as your local setup script)
+          wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+
+          # Rust tooling
+          cargo install cargo-generate
+
+          # Match your local Rust: 1.85.0 + RISC-V target
+          rustup toolchain install 1.85.0 --profile minimal
+          rustup default 1.85.0
+          rustup target add riscv64imac-unknown-none-elf
+
+      - name: Create Symlink
+        run: sudo ln -s /usr/riscv64-linux-gnu/include/gnu/stubs-lp64d.h /usr/riscv64-linux-gnu/include/gnu/stubs-lp64.h
+
+      - name: Payment Channel CKB-ETH
+        working-directory: payment-channel-ckb-eth
+        env:
+          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
+          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
+          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
+          BALANCE: "10000000000000000000"
+          RUSTFLAGS: "-C linker=rust-lld"
+          CARGO_TARGET_RISCV64IMAC_UNKNOWN_NONE_ELF_LINKER: rust-lld
+          CC_riscv64imac_unknown_none_elf: riscv64-unknown-elf-gcc
+          AR_riscv64imac_unknown_none_elf: riscv64-unknown-elf-ar
+          C_INCLUDE_PATH: /usr/riscv64-linux-gnu/include
+          CFLAGS: "-I/usr/riscv64-linux-gnu/include"
+          TARGET_CFLAGS: "-I/usr/riscv64-linux-gnu/include"
+        run: |
+          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }}  --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
+
+          sleep 5
+          sudo apt-get update
+          sudo apt-get install -y \
+            jq sed gawk tmux tmuxp expect make \
+            build-essential cmake python3
+          curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.201.0/ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
+          sudo cp ckb_v0.201.0_x86_64-unknown-linux-gnu/ckb /usr/local/bin/
+          curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.4.0/ckb-cli_v1.4.0_x86_64-unknown-linux-gnu.tar.gz
+          curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.13.0/ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
+          sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
+          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+
+          git submodule update --init --recursive
+          cd ./devnet
+          chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
+          ./setup-devnet.sh
+          offckb node > /dev/null 2>&1 &
+          sleep 3
+          ckb miner > /dev/null 2>&1 &
+          sleep 3
+          ./print_accounts.sh
+          sleep 6
+          ./fund_omni_accounts.sh
+          sleep 10
+          ./deploy_contracts.sh
+          sleep 15
+          ./sudt_helper.sh fund
+          sleep 10
+          ./sudt_helper.sh balances
+          cd ..
+          unset C_INCLUDE_PATH CFLAGS TARGET_CFLAGS
+          unset CC_riscv64imac_unknown_none_elf AR_riscv64imac_unknown_none_elf
+    
+          go run main.go
+          docker stop ganache
+          sudo pkill -x ckb || true
+          sudo pkill -f offckb || true
+          sleep 1
+          sudo lsof /usr/local/bin/ckb || true
+          sudo rm -f /usr/local/bin/ckb || true
 
       - name: Payment Channel XLM
         working-directory: payment-channel-xlm
