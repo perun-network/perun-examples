@@ -20,9 +20,9 @@ import (
 	"time"
 
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
-	"github.com/perun-network/perun-libp2p-wire/p2p"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
+	p2p "perun.network/go-perun/wire/net/libp2p"
 )
 
 const (
@@ -46,24 +46,11 @@ func main() {
 
 	// Setup bus.
 	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-	aliceNet, err := p2p.NewP2PBus(ethwallet.BackendID, aliceWireAcc)
-	if err != nil {
-		log.Fatalf("creating p2p net: %v", err)
-	}
-	aliceBus := aliceNet.Bus
-	aliceListener := aliceNet.Listener
-	go aliceBus.Listen(aliceListener)
+	aliceBus, aliceDialer := setupBusWire(aliceWireAcc)
 
 	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-	bobNet, err := p2p.NewP2PBus(ethwallet.BackendID, bobWireAcc)
-	if err != nil {
-		log.Fatalf("creating p2p net: %v", err)
-	}
-	bobBus := bobNet.Bus
-	bobListener := bobNet.Listener
-	go bobBus.Listen(bobListener)
-
-	aliceNet.Dialer.Register(map[wallet.BackendID]wire.Address{ethwallet.BackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
+	bobBus, _ := setupBusWire(bobWireAcc)
+	aliceDialer.Register(map[wallet.BackendID]wire.Address{ethwallet.BackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
 
 	// Setup clients.
 	log.Println("Setting up clients.")
