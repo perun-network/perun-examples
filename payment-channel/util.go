@@ -26,7 +26,11 @@ import (
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
+	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
+	"perun.network/go-perun/wire/net"
+	p2p "perun.network/go-perun/wire/net/libp2p"
+	perunio "perun.network/go-perun/wire/perunio/serializer"
 	"perun.network/perun-examples/payment-channel/client"
 )
 
@@ -93,6 +97,20 @@ func setupPaymentClient(
 	}
 
 	return c
+}
+
+// setupBusWire sets up a wire.Bus for the given wire.Account.
+func setupBusWire(acc *p2p.Account) (wire.Bus, *p2p.Dialer) {
+	id := make(map[wallet.BackendID]wire.Account)
+	id[ethwallet.BackendID] = acc
+
+	listener := p2p.NewP2PListener(acc)
+	dialer := p2p.NewP2PDialer(acc)
+
+	bus := net.NewBus(id, dialer, perunio.Serializer())
+
+	go bus.Listen(listener)
+	return bus, dialer
 }
 
 // balanceLogger is a utility for logging client balances.

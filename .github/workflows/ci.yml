@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '1.23'
+          go-version: "1.23"
       - uses: actions/cache@v3
         with:
           path: |
@@ -38,18 +38,17 @@ jobs:
 
       - name: Payment Channel ETH
         working-directory: payment-channel
-        env:
-          KEY_DEPLOYER: "0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e"
-          KEY_ALICE: "0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f"
-          KEY_BOB: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e"
-          BALANCE: "10000000000000000000"
         run: |
-          docker run --rm --name ganache --detach --publish 8545:8545 ${{ env.ganache-image }} --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
+          docker build -t payment-channel-hardhat .
+          docker run --rm --name payment-channel-hardhat \
+          -d -p 8545:8545 \
+          payment-channel-hardhat
+
 
           sleep 5
           go run .
-          docker stop ganache
-      
+          docker stop payment-channel-hardhat
+
       - name: Multiledger Payment Channel
         working-directory: multiledger-channel
         env:
@@ -68,7 +67,7 @@ jobs:
           go run .
           docker stop ganache-a
           docker stop ganache-b
-          
+
       - name: App Channel
         working-directory: app-channel
         run: |
@@ -81,7 +80,7 @@ jobs:
           sleep 5
           go run .
           docker stop appchannel-devnet
-  
+
       - name: Install contract dependencies
         run: |
           sudo apt-get update
@@ -163,7 +162,7 @@ jobs:
           cd ..
           unset C_INCLUDE_PATH CFLAGS TARGET_CFLAGS
           unset CC_riscv64imac_unknown_none_elf AR_riscv64imac_unknown_none_elf
-    
+
           go run main.go
           docker stop ganache
           sudo pkill -x ckb || true
@@ -176,7 +175,7 @@ jobs:
         working-directory: payment-channel-xlm
         run: |
           docker stop stellar soroban-preview || true
-          
+
           sleep 5
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
@@ -186,7 +185,7 @@ jobs:
 
           sleep 50
           go run ./
-          docker stop stellar 
+          docker stop stellar
 
       - name: Payment Channel Cross-Contract
         working-directory: payment-channel-cc
@@ -200,10 +199,10 @@ jobs:
 
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
-          
+
           chmod +x ./quickstart.sh
           ./quickstart.sh standalone &
-          
+
           sleep 50
           go run .
           docker stop ganache
@@ -232,7 +231,6 @@ jobs:
           go run .
           docker stop polkadot
 
-
       - name: Install CKB contract dependencies
         run: |
           sudo apt-get update
@@ -255,36 +253,36 @@ jobs:
           CFLAGS: "-I/usr/riscv64-linux-gnu/include"
           TARGET_CFLAGS: "-I/usr/riscv64-linux-gnu/include"
         run: |
-            sudo apt-get update
-            sudo apt-get install -y jq sed gawk tmux tmuxp expect make
-            curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.201.0/ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
-            tar -xzf ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
-            sudo cp ckb_v0.201.0_x86_64-unknown-linux-gnu/ckb /usr/local/bin/
-            curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.4.0/ckb-cli_v1.4.0_x86_64-unknown-linux-gnu.tar.gz
-            curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.13.0/ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
-            tar -xzf ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
-            sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
-            wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
-            sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+          sudo apt-get update
+          sudo apt-get install -y jq sed gawk tmux tmuxp expect make
+          curl -LO https://github.com/nervosnetwork/ckb/releases/download/v0.201.0/ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf ckb_v0.201.0_x86_64-unknown-linux-gnu.tar.gz
+          sudo cp ckb_v0.201.0_x86_64-unknown-linux-gnu/ckb /usr/local/bin/
+          curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.4.0/ckb-cli_v1.4.0_x86_64-unknown-linux-gnu.tar.gz
+          curl -LO https://github.com/nervosnetwork/ckb-cli/releases/download/v1.13.0/ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf ckb-cli_v1.13.0_x86_64-unknown-linux-gnu.tar.gz
+          sudo cp ckb-cli_v1.13.0_x86_64-unknown-linux-gnu/ckb-cli /usr/local/bin/
+          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
 
-            git submodule update --init --recursive
-            cd ./devnet
-            chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
-            ./setup-devnet.sh
-            ckb run > /dev/null 2>&1 &
-            sleep 3
-            ckb miner > /dev/null 2>&1 &
-            sleep 3
-            ./print_accounts.sh
-            sleep 6
-            expect fund_accounts.expect
-            sleep 10
-            ./deploy_contracts.sh
-            sleep 15
-            ./sudt_helper.sh fund
-            sleep 10
-            ./sudt_helper.sh balances
-            cd ../..
+          git submodule update --init --recursive
+          cd ./devnet
+          chmod +x setup-devnet.sh print_accounts.sh deploy_contracts.sh sudt_helper.sh 
+          ./setup-devnet.sh
+          ckb run > /dev/null 2>&1 &
+          sleep 3
+          ckb miner > /dev/null 2>&1 &
+          sleep 3
+          ./print_accounts.sh
+          sleep 6
+          expect fund_accounts.expect
+          sleep 10
+          ./deploy_contracts.sh
+          sleep 15
+          ./sudt_helper.sh fund
+          sleep 10
+          ./sudt_helper.sh balances
+          cd ../..
       - name: Payment Channel CKB
         working-directory: payment-channel-ckb
         run: |
