@@ -1,0 +1,9 @@
+{
+  "name": "multiledger-channel-chain1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "hardhat": "^2.0.0"
+  }
+}

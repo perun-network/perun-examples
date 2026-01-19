@@ -1,27 +1,51 @@
 # multi-ledger-channel
 
-Install [ganache-cli](https://github.com/trufflesuite/ganache-cli) and start the
-first chain by running:
-```sh
-KEY_DEPLOYER=0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e
-KEY_ALICE=0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f
-KEY_BOB=0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e
-BALANCE=100000000000000000000000
+## Requirements
+- Node.js 20.x or higher
+- npm
+- Hardhat 2.22.x
 
-ganache --h 127.0.0.1 --port 8545 --chain.chainId 1337 --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
-```
-Open up a second terminal and start the second chain:
+## Setup
+Install dependencies:
 ```sh
-KEY_DEPLOYER=0x79ea8f62d97bc0591a4224c1725fca6b00de5b2cea286fe2e0bb35c5e76be46e
-KEY_ALICE=0x1af2e950272dd403de7a5760d41c6e44d92b6d02797e51810795ff03cc2cda4f
-KEY_BOB=0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e
-BALANCE=100000000000000000000000
-
-ganache --h 127.0.0.1 --port 8546 --chain.chainId 1338 --wallet.accounts $KEY_DEPLOYER,$BALANCE $KEY_ALICE,$BALANCE $KEY_BOB,$BALANCE --b=5
+cd multiledger-channel/chain1
+npm install
 ```
 
+## Running the Ethereum Testnet
 
-Then run
+### Using Hardhat (Recommended)
+
+On one terminal:
+```sh
+cd multiledger-channel/chain1
+npx hardhat node --port 8545
+```
+
+On another terminal:
+```sh
+cd multiledger-channel/chain1
+npx hardhat node --port 8546
+```
+
+### Using Docker
+Build and run both Hardhat nodes:
+```sh
+docker build -t hardhat-chain1 -f chain1/Dockerfile chain1
+docker build -t hardhat-chain2 -f chain2/Dockerfile chain2
+
+docker run -d --name chain1 -p 8545:8545 hardhat-chain1
+docker run -d --name chain2 -p 8546:8545 hardhat-chain2
+```
+
+To stop the chains:
+```sh
+docker stop chain1 chain2
+docker rm chain1 chain2
+```
+
+## Running the Application
+With both chains running, execute:
 ```
 go run .
 ```
