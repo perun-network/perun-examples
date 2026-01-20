@@ -3,11 +3,11 @@
     "sudt": {
       "script_id": {
         "hash_type": "data1",
-        "code_hash": "0x6ff634668e01e792c9ac3d284f0961bf23a7f955cd4ec9f1396f135cd2d6e72c"
+        "code_hash": "0x2d9863454393aa0d8e417398322ffab66b12d11de8ec5be51373c3baac17a4e9"
       },
       "cell_dep": {
         "out_point": {
-          "tx_hash": "0x2a337fa548bdb24006dff67a383a176df32af1fad2cd2aff27a99660bf4c8990",
+          "tx_hash": "0x6b63b3c4be0ebae06c0446b3a460ffea96b2eee59f4ef3efda67e9c1482080d9",
           "index": "0x0"
         },
         "dep_type": "code"

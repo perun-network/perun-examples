@@ -7,7 +7,7 @@
       {
         "cellDep": {
           "outPoint": {
-            "txHash": "0x3adf8c8bf04842c83cdaa21072cd3c4f869e8f7448b68d9baa409f6dc09f09b6",
+            "txHash": "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
             "index": 0
           },
           "depType": "depGroup"
@@ -22,7 +22,7 @@
       {
         "cellDep": {
           "outPoint": {
-            "txHash": "0x3adf8c8bf04842c83cdaa21072cd3c4f869e8f7448b68d9baa409f6dc09f09b6",
+            "txHash": "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
             "index": 1
           },
           "depType": "depGroup"
@@ -37,7 +37,7 @@
       {
         "cellDep": {
           "outPoint": {
-            "txHash": "0x6141d3dc3ccd8cbe4f0870676649778dd0f0422cf19735fcdebfa003fa980a40",
+            "txHash": "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
             "index": 8
           },
           "depType": "code"
@@ -52,7 +52,7 @@
       {
         "cellDep": {
           "outPoint": {
-            "txHash": "0x6141d3dc3ccd8cbe4f0870676649778dd0f0422cf19735fcdebfa003fa980a40",
+            "txHash": "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
             "index": 7
           },
           "depType": "code"
@@ -61,7 +61,7 @@
       {
         "cellDep": {
           "outPoint": {
-            "txHash": "0x3adf8c8bf04842c83cdaa21072cd3c4f869e8f7448b68d9baa409f6dc09f09b6",
+            "txHash": "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
             "index": 0
           },
           "depType": "depGroup"
@@ -76,7 +76,7 @@
       {
         "cellDep": {
           "outPoint": {
-            "txHash": "0x6141d3dc3ccd8cbe4f0870676649778dd0f0422cf19735fcdebfa003fa980a40",
+            "txHash": "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
             "index": 6
           },
           "depType": "code"
