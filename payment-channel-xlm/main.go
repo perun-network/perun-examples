@@ -19,7 +19,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/perun-network/perun-libp2p-wire/p2p"
+	p2p "perun.network/go-perun/wire/net/libp2p"
 	"perun.network/perun-examples/payment-channel-xlm/client"
 	"perun.network/perun-examples/payment-channel-xlm/util"
 	"perun.network/perun-stellar-backend/wallet/types"
@@ -27,6 +27,8 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
+	"perun.network/go-perun/wire/net"
+	perunio "perun.network/go-perun/wire/perunio/serializer"
 )
 
 func main() {
@@ -57,25 +59,13 @@ func payment_example(setup *util.Setup) {
 
 	log.Println("Initializing a connection between Alice and Bob")
 
+	// Setup bus.
 	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-	aliceNet, err := p2p.NewP2PBus(types.StellarBackendID, aliceWireAcc)
-	if err != nil {
-		log.Fatalf("creating p2p net: %v", err)
-	}
-	aliceBus := aliceNet.Bus
-	aliceListener := aliceNet.Listener
-	go aliceBus.Listen(aliceListener)
+	aliceBus, aliceDialer := setupBusWire(aliceWireAcc)
 
 	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-	bobNet, err := p2p.NewP2PBus(types.StellarBackendID, bobWireAcc)
-	if err != nil {
-		log.Fatalf("creating p2p net: %v", err)
-	}
-	bobBus := bobNet.Bus
-	bobListener := bobNet.Listener
-	go bobBus.Listen(bobListener)
-
-	aliceNet.Dialer.Register(map[wallet.BackendID]wire.Address{types.StellarBackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
+	bobBus, _ := setupBusWire(bobWireAcc)
+	aliceDialer.Register(map[wallet.BackendID]wire.Address{types.StellarBackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
 
 	log.Println("Setup payment clients for Alice and Bob")
 	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, aliceWireAcc.Address(), setup.GetTokenAsset(), aliceBus, funderAlice, adjAlice)
@@ -127,4 +117,18 @@ func printBalances(balances channel.Balances) {
 	log.Printf("Asset:\n")
 	log.Printf("  Alice: %s\n", balances[0][0].String())
 	log.Printf("  Bob: %s\n", balances[0][1].String())
+}
+
+// setupBusWire sets up a wire.Bus for the given wire.Account.
+func setupBusWire(acc *p2p.Account) (wire.Bus, *p2p.Dialer) {
+	id := make(map[wallet.BackendID]wire.Account)
+	id[types.StellarBackendID] = acc
+
+	listener := p2p.NewP2PListener(acc)
+	dialer := p2p.NewP2PDialer(acc)
+
+	bus := net.NewBus(id, dialer, perunio.Serializer())
+
+	go bus.Listen(listener)
+	return bus, dialer
 }
