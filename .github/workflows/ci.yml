@@ -5,9 +5,6 @@ jobs:
   test-examples:
     name: Test Examples
     runs-on: ubuntu-latest
-    env:
-      ganache-image: trufflesuite/ganache:v7.9.1
-
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
@@ -32,9 +29,6 @@ jobs:
         run: |
           chmod +x ./testdata/docker/build.sh
           ./testdata/docker/build.sh
-
-      - name: Pull ganache-cli image
-        run: docker pull ${{ env.ganache-image }}
 
       - name: Payment Channel ETH
         working-directory: payment-channel

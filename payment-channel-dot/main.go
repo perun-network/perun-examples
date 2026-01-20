@@ -19,10 +19,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/perun-network/perun-libp2p-wire/p2p"
 	"github.com/perun-network/perun-polkadot-backend/wallet"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
+	p2p "perun.network/go-perun/wire/net/libp2p"
 )
 
 const (
@@ -43,24 +43,12 @@ func main() {
 	log.Println("Initializing a connection between Alice and Bob")
 
 	aliceWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-	aliceNet, err := p2p.NewP2PBus(wallet.BackendID, aliceWireAcc)
-	if err != nil {
-		log.Fatalf("creating p2p net: %v", err)
-	}
-	aliceBus := aliceNet.Bus
-	aliceListener := aliceNet.Listener
-	go aliceBus.Listen(aliceListener)
+	aliceBus, aliceDialer := setupBusWire(aliceWireAcc)
 
 	bobWireAcc := p2p.NewRandomAccount(rand.New(rand.NewSource(time.Now().UnixNano())))
-	bobNet, err := p2p.NewP2PBus(wallet.BackendID, bobWireAcc)
-	if err != nil {
-		log.Fatalf("creating p2p net: %v", err)
-	}
-	bobBus := bobNet.Bus
-	bobListener := bobNet.Listener
-	go bobBus.Listen(bobListener)
+	bobBus, _ := setupBusWire(bobWireAcc)
 
-	aliceNet.Dialer.Register(map[pwallet.BackendID]wire.Address{wallet.BackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
+	aliceDialer.Register(map[pwallet.BackendID]wire.Address{wallet.BackendID: bobWireAcc.Address()}, bobWireAcc.ID().String())
 
 	// Setup clients.
 	log.Println("Setting up clients.")

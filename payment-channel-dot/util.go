@@ -18,7 +18,11 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/perun-network/perun-polkadot-backend/pkg/sr25519"
 	dot "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
-	"perun.network/go-perun/wallet"
+	"github.com/perun-network/perun-polkadot-backend/wallet"
+	pwallet "perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire/net"
+	p2p "perun.network/go-perun/wire/net/libp2p"
+	perunio "perun.network/go-perun/wire/perunio/serializer"
 
 	"log"
 
@@ -76,7 +80,7 @@ func newBalanceLogger(nodeURL string, networkID dot.NetworkID) balanceLogger {
 }
 
 // LogBalances prints the balances of the specified accounts.
-func (l balanceLogger) LogBalances(addrs ...wallet.Address) {
+func (l balanceLogger) LogBalances(addrs ...pwallet.Address) {
 	bals := make([]*dot.Dot, len(addrs))
 	for i, addr := range addrs {
 		accInfo, err := l.api.AccountInfo(dotwallet.AsAddr(addr).AccountID())
@@ -86,4 +90,18 @@ func (l balanceLogger) LogBalances(addrs ...wallet.Address) {
 		bals[i] = client.PlanckToDot(accInfo.Free.Int)
 	}
 	log.Println("Client balances (DOT):", bals)
+}
+
+// setupBusWire sets up a wire.Bus for the given wire.Account.
+func setupBusWire(acc *p2p.Account) (wire.Bus, *p2p.Dialer) {
+	id := make(map[pwallet.BackendID]wire.Account)
+	id[wallet.BackendID] = acc
+
+	listener := p2p.NewP2PListener(acc)
+	dialer := p2p.NewP2PDialer(acc)
+
+	bus := net.NewBus(id, dialer, perunio.Serializer())
+
+	go bus.Listen(listener)
+	return bus, dialer
 }
