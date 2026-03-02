@@ -18,6 +18,7 @@ perun-ckb-demo
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+devnet/accounts
 devnet/data
 devnet/specs
 devnet/ckb-miner.toml

@@ -20,8 +20,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/perun-network/perun-eth-backend/bindings/peruntoken"
 
+	"github.com/perun-network/perun-eth-backend/bindings/peruntoken"
+	p2p "perun.network/go-perun/wire/net/libp2p"
+	perunio "perun.network/go-perun/wire/perunio/serializer"
 	"perun.network/perun-examples/multiledger-channel/client"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -29,9 +31,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
+	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	swallet "github.com/perun-network/perun-eth-backend/wallet/simple"
 
+	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
+	"perun.network/go-perun/wire/net"
 )
 
 // deployContracts deploys the Perun smart contracts on the specified chains and
@@ -163,4 +168,18 @@ func (l balanceLogger) LogBalances(addresses ...common.Address) {
 
 	log.Println("Client balances Chain A (PRN):", getBals(l.ethClientA, l.tokenA))
 	log.Println("Client balances Chain B (PRN):", getBals(l.ethClientB, l.tokenB))
+}
+
+// setupBusWire sets up a wire.Bus for the given wire.Account.
+func setupBusWire(acc *p2p.Account) (wire.Bus, *p2p.Dialer) {
+	id := make(map[wallet.BackendID]wire.Account)
+	id[ethwallet.BackendID] = acc
+
+	listener := p2p.NewP2PListener(acc)
+	dialer := p2p.NewP2PDialer(acc)
+
+	bus := net.NewBus(id, dialer, perunio.Serializer())
+
+	go bus.Listen(listener)
+	return bus, dialer
 }

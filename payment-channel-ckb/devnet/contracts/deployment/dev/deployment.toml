@@ -37,5 +37,5 @@ location = { file = "build/release/perun-funds-lockscript" }
 # # For example the secp256k1 lock
 [lock]
 code_hash = "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"
-args = "0x3a0707eb689074169f1b0b901f00c6741b4ad076"
+args = "0xbdce706c5d400015bf170a19b58c8c58c8cfcbb4"
 hash_type = "type"
