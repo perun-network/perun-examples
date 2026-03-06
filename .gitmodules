@@ -7,3 +7,6 @@
 [submodule "payment-channel-ckb-eth/devnet/contracts"]
 	path = payment-channel-ckb-eth/devnet/contracts
 	url = https://github.com/perun-network/perun-ckb-contract
+[submodule "virtual-channel-ckb-eth/devnet/contracts"]
+	path = virtual-channel-ckb-eth/devnet/contracts
+	url = https://github.com/perun-network/perun-ckb-contract
