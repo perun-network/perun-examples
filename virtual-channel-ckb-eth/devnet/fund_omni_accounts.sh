@@ -42,8 +42,10 @@ fund_address() {
 # Extract addresses
 alice=$(extract_address "$ACCOUNTS_DIR/alice.txt")
 bob=$(extract_address "$ACCOUNTS_DIR/bob.txt")
+ingrid=$(extract_address "$ACCOUNTS_DIR/ingrid.txt")
 alice_def=$(extract_address "$ACCOUNTS_DIR/alice_default.txt")
 bob_def=$(extract_address "$ACCOUNTS_DIR/bob_default.txt")
+ingrid_def=$(extract_address "$ACCOUNTS_DIR/ingrid_default.txt")
 
 # Fund each account
 fund_address "$alice"
@@ -53,5 +55,9 @@ sleep 5
 fund_address "$alice_def"
 sleep 5
 fund_address "$bob_def"
+sleep 5
+fund_address "$ingrid"
+sleep 5
+fund_address "$ingrid_def"
 
 echo "✅ All transfers completed."

@@ -16,6 +16,10 @@ export default {
         {
           privateKey: "0xf63d7d8e930bccd74e93cf5662fde2c28fd8be95edb70c73f1bdd863d07f412e",
           balance: "10000000000000000000"
+        },
+        {
+          privateKey: "0x1c8e5b9a7c3d2e4f8a1b2c3d4e5f67890abcdef1234567890abcdef123456789",
+          balance: "10000000000000000000"
         }
       ],
       blockGasLimit: 12000000,

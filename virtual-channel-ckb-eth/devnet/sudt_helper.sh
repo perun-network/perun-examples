@@ -14,15 +14,16 @@ check_files() {
   done
 }
 
-check_files "$ACCOUNTS_DIR/alice.txt" "$ACCOUNTS_DIR/bob.txt" "$ACCOUNTS_DIR/genesis-2.txt" "$SYSTEM_SCRIPTS_DIR/sudt-celldep.json"
+check_files "$ACCOUNTS_DIR/alice.txt" "$ACCOUNTS_DIR/bob.txt" "$ACCOUNTS_DIR/ingrid.txt" "$ACCOUNTS_DIR/genesis-2.txt" "$SYSTEM_SCRIPTS_DIR/sudt-celldep.json"
 
 ALICE=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/alice.txt")
 BOB=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/bob.txt")
+INGRID=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/ingrid.txt")
 GENESIS1=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/genesis-1.txt")
 GENESIS2=$(awk '/^ckb_address:/ {print $2}' "$ACCOUNTS_DIR/genesis-2.txt")
 
 fund_genesis() {
-  echo "Funding accounts for Alice, Bob with SUDT tokens"
+  echo "Funding accounts for Alice, Bob, and Ingrid  with SUDT tokens"
   SUDT_AMOUNT=200000000
 
   expect << EOF
@@ -40,7 +41,7 @@ EOF
 }
 
 list_accounts_balances() {
-  echo "Listing SUDT account balances for Alice and Bob"
+  echo "Listing SUDT account balances for Alice, Bob, and Ingrid"
   echo "Genesis sUDT1: ========================================"
   ckb-cli sudt get-amount --owner $GENESIS1 --cell-deps $SYSTEM_SCRIPTS_DIR/sudt-celldep.json --address $GENESIS2
   echo "Genesis sUDT2: ========================================"
@@ -50,7 +51,7 @@ list_accounts_balances() {
 
 if [ $# -eq 0 ]; then
   echo "No arguments provided. Please provide one of the following:"
-  echo "  balances: list SUDT account balances for Alice and Bob"
+  echo "  balances: list SUDT account balances for Alice and Bob, and Ingrid"
   echo "  fund: fund Alice and Bob with SUDT tokens"
   exit 1
 fi

@@ -17,10 +17,11 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/nervosnetwork/ckb-sdk-go/v2/types"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/nervosnetwork/ckb-sdk-go/v2/types"
 	"perun.network/perun-ckb-backend/channel/test"
 	"perun.network/perun-ckb-backend/wallet/address"
 )
@@ -32,7 +33,7 @@ const (
 )
 
 func main() {
-	names := []string{"alice", "bob"}
+	names := []string{"alice", "bob", "ingrid"}
 
 	hash := types.HexToHash(ethAuthCodeHash)
 
