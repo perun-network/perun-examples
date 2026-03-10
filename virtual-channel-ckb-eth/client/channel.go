@@ -17,9 +17,10 @@ package client
 import (
 	"context"
 	"math/big"
+	"time"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
-	"time"
 )
 
 // PaymentChannel is a wrapper for a Perun channel for the payment use case.
@@ -41,6 +42,10 @@ func (c *PaymentChannel) GetChannelParams() *channel.Params {
 
 func (c *PaymentChannel) GetChannelState() *channel.State {
 	return c.ch.State()
+}
+
+func (c *PaymentChannel) ID() channel.ID {
+	return c.ch.ID()
 }
 
 // newPaymentChannel creates a new payment channel.
@@ -102,8 +107,23 @@ func (c PaymentChannel) SendCKBPayment(amount int64) {
 
 }
 
+func (c PaymentChannel) Finalize() {
+	// Finalize the channel to enable fast settlement.
+	if !c.ch.State().IsFinal {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
+		defer cancel()
+		err := c.ch.Update(ctx, func(state *channel.State) {
+			state.IsFinal = true
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
+
+}
+
 // Settle settles the payment channel and withdraws the funds.
-func (c PaymentChannel) Settle() {
+func (c PaymentChannel) Settle(secondary bool) {
 	// Finalize the channel to enable fast settlement.
 	if !c.ch.State().IsFinal {
 		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
@@ -117,9 +137,9 @@ func (c PaymentChannel) Settle() {
 	}
 
 	// Settle concludes the channel and withdraws the funds.
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
 	defer cancel()
-	err := c.ch.Settle(ctx, false)
+	err := c.ch.Settle(ctx, secondary)
 	if err != nil {
 		panic(err)
 	}

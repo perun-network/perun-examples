@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/nervosnetwork/ckb-sdk-go/v2/rpc"
@@ -85,8 +86,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	kIngrid, err := crypto.HexToECDSA(keyIngrid)
+	if err != nil {
+		panic(err)
+	}
 	ckbWalletA := wallet.NewEphemeralWallet()
 	ckbWalletB := wallet.NewEphemeralWallet()
+	ckbWalletI := wallet.NewEphemeralWallet()
 
 	keyAliceCkb, err := deployment.GetKey("./devnet/accounts/alice.pk")
 	if err != nil {
@@ -96,19 +102,30 @@ func main() {
 	if err != nil {
 		log.Fatalf("error getting bob's private key: %v", err)
 	}
+	keyIngridCkb, err := deployment.GetKey("./devnet/accounts/ingrid.pk")
+	if err != nil {
+		log.Fatalf("error getting ingrid's private key: %v", err)
+	}
 	ethWalletA := swallet.NewWallet(kAlice)
 	accA := crypto.PubkeyToAddress(kAlice.PublicKey)
 	eaddrA := ethwallet.AsWalletAddr(accA)
 	ethWalletB := swallet.NewWallet(kBob)
 	accB := crypto.PubkeyToAddress(kBob.PublicKey)
 	eaddrB := ethwallet.AsWalletAddr(accB)
+	ethWalletI := swallet.NewWallet(kIngrid)
+	accI := crypto.PubkeyToAddress(kIngrid.PublicKey)
+	eaddrI := ethwallet.AsWalletAddr(accI)
+
 	omniHash := d.OmniLockScript.CodeHash
 	alicePart, authDataAlice, _ := ckbaddress.NewEthereumParticipantFromPublicKey(keyAliceCkb.PubKey(), omniHash)
 	bobPart, authDataBob, _ := ckbaddress.NewEthereumParticipantFromPublicKey(keyBobCkb.PubKey(), omniHash)
+	ingridPart, authDataIngrid, _ := ckbaddress.NewEthereumParticipantFromPublicKey(keyIngridCkb.PubKey(), omniHash)
 	aliceAccount := wallet.NewAccountFromPrivateKey(keyAliceCkb, omniHash, false)
 	bobAccount := wallet.NewAccountFromPrivateKey(keyBobCkb, omniHash, false)
+	ingridAccount := wallet.NewAccountFromPrivateKey(keyIngridCkb, omniHash, false)
 	ckbWalletA.AddAccount(aliceAccount)
 	ckbWalletB.AddAccount(bobAccount)
+	ckbWalletI.AddAccount(ingridAccount)
 
 	ckbAsset := ckbasset.NewCKBytesAsset()
 	id := ckbasset.MakeCCID(ckbasset.MakeContractID("03"))
@@ -119,6 +136,10 @@ func main() {
 		log.Fatalf("cannot connect: %v", err)
 	}
 	backendRPCClientBob, err := rpc.Dial("http://localhost:8114")
+	if err != nil {
+		log.Fatalf("cannot connect: %v", err)
+	}
+	backendRPCClientIngrid, err := rpc.Dial("http://localhost:8114")
 	if err != nil {
 		log.Fatalf("cannot connect: %v", err)
 	}
@@ -138,42 +159,78 @@ func main() {
 	ckbFunderB.MaxIterationsUntilAbort = 80
 	ckbAdjudicatorB := adjudicator.NewAdjudicator(ckbClientB)
 
+	signerI := backend.NewEVMSignerInstance(ingridPart.ToCKBAddress(network), *keyIngridCkb, network, authDataIngrid)
+	txSignerI := signerI.Signer()
+	txSignerI.RegisterLockSigner(d.OmniLockScript.CodeHash, &ckbsigner.OmnilockSigner{})
+	ckbClientI, _ := ckbclient.NewClient(backendRPCClientIngrid, signerI, d)
+	ckbFunderI := funder.NewDefaultFunder(ckbClientI, d)
+	ckbFunderI.MaxIterationsUntilAbort = 80
+	ckbAdjudicatorI := adjudicator.NewAdjudicator(ckbClientI)
+
 	bus := wire.NewLocalBus() // Message bus used for off-chain communication.
 	alice, _ := client.SetupPaymentClient(bus, ethWalletA, accA, eaddrA, chainURL, 1337, ethadjudicator, asset, ckbWalletA, aliceAccount, &ca, ckbFunderA, ckbAdjudicatorA)
 
 	bob, _ := client.SetupPaymentClient(bus, ethWalletB, accB, eaddrB, chainURL, 1337, ethadjudicator, asset, ckbWalletB, bobAccount, &ca, ckbFunderB, ckbAdjudicatorB)
 
-	log.Println("Participants: ", alice.WireAddress(), bob.WireAddress())
+	ingrid, _ := client.SetupPaymentClient(bus, ethWalletI, accI, eaddrI, chainURL, 1337, ethadjudicator, asset, ckbWalletI, ingridAccount, &ca, ckbFunderI, ckbAdjudicatorI)
+
+	log.Println("Participants: ", alice.WireAddress(), bob.WireAddress(), ingrid.WireAddress())
 
 	// Print balances before transactions.
 	l := ethereumUtil.NewBalanceLogger(chainURL)
-	l.LogBalances(alice.WalletEthAddress(), bob.WalletEthAddress())
+	l.LogBalances(alice.WalletEthAddress(), bob.WalletEthAddress(), ingrid.WalletEthAddress())
 	ckbLogger := ethereumUtil.NewCKBBalanceLogger("http://localhost:8114")
 	ckbLogger.LogBalances(aliceAccount.Address().(*ckbaddress.Participant))
 	ckbLogger.LogBalances(bobAccount.Address().(*ckbaddress.Participant))
 
 	// Open channel, transact, close.
 	log.Println("Opening channel and depositing funds.")
-	chAlice := alice.OpenChannel(bob.WireAddress(), 1, 50)
-	log.Println("Channel accepted by Bob.")
-	chBob := bob.AcceptedChannel()
+	chAI := alice.OpenChannel(ingrid.WireAddress(), 4, 100)
+	log.Println("Channel accepted by Ingrid.")
+	chIA := ingrid.AcceptedChannel()
 
-	log.Println("Sending payments...")
-	chAlice.SendEthPayment(1)
-	chBob.SendCKBPayment(50)
-	log.Println("Alice sent Bob a payment")
-	printBalances(chAlice, ca)
-	log.Println("Settling channel.")
-	chAlice.Settle() // Settle
+	chBI := bob.OpenChannel(ingrid.WireAddress(), 4, 100)
+	log.Println("Channel accepted by Bob.")
+	chIB := ingrid.AcceptedChannel()
+
+	// Open virtual channel.
+	chAB := alice.OpenVirtualChannel(bob.WireAddress(), 2, 50, chAI.ID(), chBI.ID())
+	log.Println("Virtual channel accepted by Bob.")
+	chBA := bob.AcceptedChannel()
+
+	// Closing virtual channel.
+	log.Println("Closing virtual channel.")
+
+	chAB.Finalize()
+
+	var success sync.WaitGroup
+	chs := []*client.PaymentChannel{chAB, chBA}
+	success.Add(len(chs))
+	for _, ch := range chs {
+		go func(ch *client.PaymentChannel) {
+			ch.Settle(false)
+			success.Done()
+		}(ch)
+	}
+	// Wait for success or error.
+	success.Wait()
+	log.Println("Virtual channel closed.")
+
+	log.Println("Settling channels.")
+	chAI.Settle(false) // Settle
+	chIA.Settle(true)
+	chBI.Settle(false)
+	chIB.Settle(true)
 
 	// Print balances after transactions.
-	l.LogBalances(alice.WalletEthAddress(), bob.WalletEthAddress())
+	l.LogBalances(alice.WalletEthAddress(), bob.WalletEthAddress(), ingrid.WalletEthAddress())
 	ckbLogger.LogBalances(aliceAccount.Address().(*ckbaddress.Participant))
 	ckbLogger.LogBalances(bobAccount.Address().(*ckbaddress.Participant))
-
+	ckbLogger.LogBalances(ingridAccount.Address().(*ckbaddress.Participant))
 	// Cleanup.
 	alice.Shutdown()
 	bob.Shutdown()
+	ingrid.Shutdown()
 }
 
 func parseSUDTOwnerLockArg(pathToSUDTOwnerLockArg string) (string, error) {

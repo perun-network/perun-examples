@@ -17,12 +17,14 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/big"
+	"time"
+
 	ethchannel "github.com/perun-network/perun-eth-backend/channel"
 	ethwallet "github.com/perun-network/perun-eth-backend/wallet"
 	simplewallet "github.com/perun-network/perun-eth-backend/wallet/simple"
 	ethwire "github.com/perun-network/perun-eth-backend/wire"
-	"log"
-	"math/big"
 	"perun.network/go-perun/channel/multi"
 	"perun.network/go-perun/wire/net/simple"
 	"perun.network/perun-ckb-backend/channel/adjudicator"
@@ -124,7 +126,7 @@ func SetupPaymentClient(
 		account:     account,
 		waddress:    addresses,
 		currency:    []channel.Asset{asset, ckbTokenIDs},
-		channels:    make(chan *PaymentChannel, 1),
+		channels:    make(chan *PaymentChannel, 2), // We buffer the channel to avoid blocking the handler.
 	}
 	go perunClient.Handle(c, c)
 
@@ -145,10 +147,10 @@ func (c *PaymentClient) OpenChannel(peer map[wallet.BackendID]wire.Address, ethA
 	log.Println("CKB amount: ", shannonAmount, c.currency[1])
 	initAlloc.SetAssetBalances(c.currency[0], []channel.Bal{
 		EthToWei(big.NewFloat(ethAmount)), // Our initial balance.
-		big.NewInt(0),                     // Peer's initial balance.
+		EthToWei(big.NewFloat(ethAmount)), // Peer's initial balance.
 	})
 	initAlloc.SetAssetBalances(c.currency[1], []channel.Bal{
-		big.NewInt(8000000000),                                 // Our initial balance.
+		big.NewInt(int64(8000000000 + shannonAmount.Uint64())), // Our initial balance.
 		big.NewInt(int64(8000000000 + shannonAmount.Uint64())), // Peer's initial balance.
 	})
 
@@ -170,6 +172,69 @@ func (c *PaymentClient) OpenChannel(peer map[wallet.BackendID]wire.Address, ethA
 	// ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	// defer cancel()
 	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
+	if err != nil {
+		panic(err)
+	}
+
+	// Start the on-chain event watcher. It automatically handles disputes.
+	log.Println("Starting dispute watcher", ch.ID())
+	c.startWatching(ch)
+
+	return newPaymentChannel(ch, c.currency)
+}
+
+func (c *PaymentClient) OpenVirtualChannel(
+	peer map[wallet.BackendID]wire.Address,
+	ethAmount float64,
+	ckbAmount uint64,
+	chAliceIngridID channel.ID,
+	chBobIngridID channel.ID,
+) *PaymentChannel {
+	// We define the channel participants. The proposer has always index 0. Here
+	// we use the on-chain addresses as off-chain addresses, but we could also
+	// use different ones.
+	participants := []map[wallet.BackendID]wire.Address{c.waddress, peer}
+
+	// We create an initial allocation which defines the starting balances.
+	initAlloc := channel.NewAllocation(2, []wallet.BackendID{1, 3}, c.currency[0], c.currency[1])
+	shannonAmount := CKByteToShannon(big.NewFloat(float64(ckbAmount)))
+	log.Println("ETH amount: ", ethAmount, c.currency[0])
+	log.Println("CKB amount: ", shannonAmount, c.currency[1])
+	initAlloc.SetAssetBalances(c.currency[0], []channel.Bal{
+		EthToWei(big.NewFloat(ethAmount)), // Our initial balance.
+		big.NewInt(0),                     // Peer's initial balance.
+	})
+	initAlloc.SetAssetBalances(c.currency[1], []channel.Bal{
+		big.NewInt(0), // Our initial balance.
+		big.NewInt(int64(shannonAmount.Uint64())), // Peer's initial balance.
+	})
+
+	indexMapAlice := []channel.Index{0, 1}
+	indexMapBob := []channel.Index{1, 0}
+	var aux channel.Aux
+	copy(aux[:channel.IDLen], chAliceIngridID[:])
+	copy(aux[channel.IDLen:], chBobIngridID[:])
+
+	// Prepare the channel proposal by defining the channel parameters.
+	challengeDuration := uint64(1000) // On-chain challenge duration in seconds.
+	log.Println("Creating virtual channel proposal")
+	proposal, err := client.NewVirtualChannelProposal(
+		challengeDuration,
+		c.account,
+		initAlloc,
+		participants,
+		[]channel.ID{chAliceIngridID, chBobIngridID},
+		[][]channel.Index{indexMapAlice, indexMapBob},
+		client.WithAux(aux),
+	)
+	if err != nil {
+		panic(err)
+	}
+	// Send the proposal.
+	log.Println("Sending channel proposal", proposal)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
+	ch, err := c.perunClient.ProposeChannel(ctx, proposal)
 	if err != nil {
 		panic(err)
 	}
